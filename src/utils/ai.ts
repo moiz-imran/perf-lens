@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import chalk from 'chalk';
 
 const CONFIG_DIR = path.join(os.homedir(), '.perf-lens');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
@@ -110,19 +111,52 @@ export async function getAISuggestions(issues: string[]): Promise<string> {
 
   try {
     const openai = new OpenAI({ apiKey });
-    const prompt = `Briefly analyze these frontend performance issues and suggest key fixes (be concise):\n\n${issues.join("\n")}`;
+
+    // Group issues by type for better analysis
+    const criticalIssues = issues.filter(i => i.includes('🚨'));
+    const warnings = issues.filter(i => i.includes('⚠️'));
+    const suggestions = issues.filter(i => i.includes('💡'));
+
+    const prompt = `As a frontend performance expert, analyze these issues and provide specific, actionable improvements. Focus on the most impactful changes first.
+
+Critical Issues:
+${criticalIssues.join('\n')}
+
+Warnings:
+${warnings.join('\n')}
+
+Suggestions:
+${suggestions.join('\n')}
+
+Provide a detailed analysis with:
+1. High-Impact Changes: List the top 3-5 most critical issues that should be addressed first, with specific file locations and exact changes needed
+2. Performance Impact: For each suggestion, explain the performance benefit (e.g., reduced bundle size, faster render times, better memory usage)
+3. Implementation Guide: Provide specific code examples or patterns to follow
+4. Quick Wins: Identify any simple changes that could provide immediate benefits
+5. Long-term Improvements: Suggest architectural changes if needed
+
+Be specific and actionable. Don't give generic advice. Reference specific files and components mentioned in the issues.`;
 
     const completion = await retryWithBackoff(async () => {
       return await openai.chat.completions.create({
         messages: [{ role: "user", content: prompt }],
         model: "gpt-3.5-turbo",
-        temperature: 0.5,
-        max_tokens: 50,
-        presence_penalty: -0.5
+        temperature: 0.2, // Lower temperature for more focused responses
+        max_tokens: 1000, // Increased token limit for detailed responses
+        presence_penalty: 0 // Removed negative penalty to allow more comprehensive responses
       });
     });
 
-    return completion.choices[0].message.content || "No suggestions available.";
+    const response = completion.choices[0].message.content || "No suggestions available.";
+
+    // Format the response with proper markdown
+    return `# Performance Optimization Analysis
+
+${response}
+
+${chalk.gray('─'.repeat(50))}
+${chalk.blue('ℹ️ Note:')} These suggestions are AI-generated based on static analysis. Always test changes in your specific context.`;
+
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       if (error.status === 429) {

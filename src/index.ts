@@ -61,30 +61,44 @@ program
   .description("Scan your frontend UI for performance issues")
   .action(async () => {
     try {
+      console.clear();
+      console.log(chalk.blue.bold('🔍 PerfLens Performance Scanner'));
+      console.log(chalk.gray('─'.repeat(50)));
+
       // Static Analysis
+      const spinner = ora('Running static code analysis...').start();
       const results = await analyzeProject();
+      spinner.succeed('Static analysis complete');
 
       // Lighthouse Analysis
-      const spinner = ora("Running Lighthouse audit...").start();
+      spinner.start("Running Lighthouse audit...");
       const lhResults = await runLighthouse();
       spinner.succeed("Lighthouse audit complete");
-      console.log(chalk.green("\n📊 Lighthouse Performance Report:"));
+
+      console.log('\n' + chalk.blue.bold('📊 Performance Analysis Results'));
+      console.log(chalk.gray('─'.repeat(50)));
+      console.log(results);
+
+      console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Metrics'));
+      console.log(chalk.gray('─'.repeat(50)));
       console.log(lhResults);
 
       // AI Analysis
-      spinner.start("Generating AI suggestions...");
+      spinner.start("Generating detailed optimization recommendations...");
       const allIssues = [
-        ...results.split('\n').filter(Boolean),
-        lhResults
+        ...results.split('\n').filter(line =>
+          line.includes('🚨') ||
+          line.includes('⚠️') ||
+          line.includes('💡')
+        ),
+        ...lhResults.split('\n').filter(Boolean)
       ];
+
       const aiFixes = await getAISuggestions(allIssues);
       spinner.succeed("AI analysis complete");
 
-      console.log(chalk.magenta("\n🤖 AI-Powered Optimization Suggestions:"));
-      console.log(aiFixes);
+      console.log('\n' + aiFixes);
 
-      console.log(chalk.gray("\n─".repeat(50)));
-      console.log(chalk.blue("✨ Scan complete! Review the suggestions above to improve your app's performance."));
     } catch (err) {
       console.error(chalk.red("\n❌ Error:"), (err as Error).message);
       process.exit(1);

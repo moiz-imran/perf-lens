@@ -1,6 +1,6 @@
 {
   "name": "perf-lens",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "AI-powered frontend performance optimizer",
   "main": "dist/index.js",
   "type": "module",
