@@ -1,4 +1,49 @@
 import OpenAI from "openai";
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const CONFIG_DIR = path.join(os.homedir(), '.perf-lens');
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+
+interface Config {
+  openaiApiKey?: string;
+}
+
+function getConfig(): Config {
+  try {
+    if (!fs.existsSync(CONFIG_DIR)) {
+      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    if (fs.existsSync(CONFIG_FILE)) {
+      return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+    }
+  } catch (error) {
+    console.error('Error reading config:', error);
+  }
+  return {};
+}
+
+function saveConfig(config: Config): void {
+  try {
+    if (!fs.existsSync(CONFIG_DIR)) {
+      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (error) {
+    console.error('Error saving config:', error);
+  }
+}
+
+export function setApiKey(key: string): void {
+  const config = getConfig();
+  config.openaiApiKey = key;
+  saveConfig(config);
+}
+
+export function getApiKey(): string | undefined {
+  return process.env.OPENAI_API_KEY || getConfig().openaiApiKey;
+}
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -54,9 +99,13 @@ async function retryWithBackoff<T>(
 export async function getAISuggestions(issues: string[]): Promise<string> {
   if (!issues || issues.length === 0) return "✅ No optimizations needed.";
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("OpenAI API key not found. Please set OPENAI_API_KEY environment variable.");
+    throw new Error(
+      "OpenAI API key not found! Please set it using:\n" +
+      "perf-lens config set-key YOUR_API_KEY\n" +
+      "Or set the OPENAI_API_KEY environment variable."
+    );
   }
 
   try {

@@ -1,4 +1,4 @@
-# ScanUI
+# PerfLens
 
 AI-powered frontend performance optimizer that analyzes your React, Vue, or other frontend projects for performance issues and provides intelligent suggestions for improvement.
 
@@ -14,9 +14,25 @@ AI-powered frontend performance optimizer that analyzes your React, Vue, or othe
 ## Installation
 
 ```bash
-npm install -g scan-ui
+npm install -g perf-lens
 # or
-yarn global add scan-ui
+yarn global add perf-lens
+```
+
+## Configuration
+
+First, set up your OpenAI API key (required for AI suggestions). You only need to do this once:
+
+```bash
+perf-lens config set-key YOUR_API_KEY
+```
+
+You can also use the `OPENAI_API_KEY` environment variable if you prefer.
+
+To verify your configuration:
+
+```bash
+perf-lens config get-key
 ```
 
 ## Usage
@@ -24,8 +40,22 @@ yarn global add scan-ui
 Run in your frontend project directory:
 
 ```bash
-scan-ui
+perf-lens
 ```
+
+Or use specific commands:
+
+```bash
+perf-lens analyze     # Run analysis (default command)
+perf-lens config      # Manage configuration
+```
+
+PerfLens will automatically detect and analyze your project's source code. It supports various project structures:
+- `src/` directory (standard React/Vue projects)
+- `app/` directory (Next.js 13+, Remix)
+- `pages/` directory (Next.js pages router)
+- `components/` directory
+- Root directory (if no standard directories found)
 
 ## Requirements
 

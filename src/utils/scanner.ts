@@ -546,15 +546,46 @@ async function promptForFeatures(projectInfo: ProjectInfo): Promise<ProjectInfo>
   return projectInfo;
 }
 
+function findSourceDirectory(): string {
+  const cwd = process.cwd();
+  const possibleDirs = ['src', 'app', 'pages', 'components'];
+
+  // Check for common source directories
+  for (const dir of possibleDirs) {
+    const fullPath = path.join(cwd, dir);
+    if (fs.existsSync(fullPath)) {
+      return fullPath;
+    }
+  }
+
+  // If no standard directories found, look for package.json to verify we're in a project
+  const packagePath = path.join(cwd, 'package.json');
+  if (!fs.existsSync(packagePath)) {
+    throw new Error(
+      "No package.json found! Please run this command in a JavaScript/TypeScript project root directory."
+    );
+  }
+
+  // If we found package.json but no source directories, use current directory
+  return cwd;
+}
+
 export async function analyzeProject(): Promise<string> {
-  console.clear(); // Clear the console for a clean start
-  console.log(chalk.blue.bold('\n🚀 ScanUI Performance Scanner'));
+  console.clear();
+  console.log(chalk.blue.bold('\n🚀 PerfLens Performance Scanner'));
   console.log(chalk.gray('─'.repeat(50)));
 
-  const srcPath = path.join(process.cwd(), "src");
-  if (!fs.existsSync(srcPath)) {
-    throw new Error("No src/ directory found! Run in a frontend project.");
+  let srcPath: string;
+  try {
+    srcPath = findSourceDirectory();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to analyze project: ${error.message}`);
+    }
+    throw error;
   }
+
+  console.log(chalk.gray(`Analyzing directory: ${path.relative(process.cwd(), srcPath)}`));
 
   let issues: string[] = [];
   let projectInfo: ProjectInfo = {
