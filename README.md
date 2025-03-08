@@ -4,12 +4,10 @@ AI-powered frontend performance optimizer that analyzes your React, Vue, or othe
 
 ## Features
 
-- 🔍 Framework Detection (React, Next.js, Vue, Nuxt, Astro, Remix)
-- 📊 Performance Analysis
-- 🤖 AI-Powered Suggestions
-- 🎯 Framework-Specific Checks
-- 📦 Dependency Analysis
-- 🚀 Best Practices Validation
+- 🔍 AI-Powered Code Analysis
+- 📊 Lighthouse Performance Metrics
+- 🤖 Comprehensive Performance Reports
+- 🚀 Actionable Optimization Recommendations
 
 ## Installation
 
@@ -21,7 +19,7 @@ yarn global add perf-lens
 
 ## Configuration
 
-First, set up your OpenAI API key (required for AI suggestions). You only need to do this once:
+First, set up your OpenAI API key (required for AI analysis). You only need to do this once:
 
 ```bash
 perf-lens config set-key YOUR_API_KEY
@@ -40,46 +38,41 @@ perf-lens config get-key
 Run in your frontend project directory:
 
 ```bash
-perf-lens
+perf-lens scan
 ```
 
-Or use specific commands:
+PerfLens will:
 
-```bash
-perf-lens analyze     # Run analysis (default command)
-perf-lens config      # Manage configuration
-```
+1. Analyze your entire codebase for performance issues at the code level
+2. Run Lighthouse to evaluate runtime performance metrics
+3. Generate a detailed report with file-by-file recommendations
+4. Provide actionable code examples for each issue
 
-PerfLens will automatically detect and analyze your project's source code. It supports various project structures:
-- `src/` directory (standard React/Vue projects)
-- `app/` directory (Next.js 13+, Remix)
-- `pages/` directory (Next.js pages router)
-- `components/` directory
-- Root directory (if no standard directories found)
+## How It Works
+
+PerfLens uses advanced AI to analyze your code for performance issues across various aspects:
+
+- **Render Performance**: Identifies unnecessary re-renders, expensive calculations in render methods
+- **Bundle Size**: Detects large dependencies and code splitting opportunities
+- **Memory Usage**: Finds memory leaks and inefficient memory patterns
+- **Network Performance**: Highlights excessive API calls and inefficient data fetching
+- **CSS Performance**: Detects complex selectors and layout thrashing
+- **JavaScript Performance**: Identifies inefficient algorithms and unnecessary work
+- **Asset Optimization**: Suggests improvements for images, fonts, and other assets
+
+The tool supports all major frontend frameworks and libraries:
+- React and Next.js
+- Vue and Nuxt
+- Svelte and SvelteKit
+- Angular
+- Astro
+- Remix
+- And more!
 
 ## Requirements
 
 - Node.js >= 18
 - OpenAI API Key (set as OPENAI_API_KEY in your environment)
-
-## Features Detection
-
-ScanUI automatically detects and provides specific checks for:
-- TypeScript usage
-- Tailwind CSS
-- Server-Side Rendering (SSR)
-- Static Site Generation (SSG)
-- Testing setup
-- State management
-- Routing implementation
-- Styling solutions
-
-## Framework-Specific Checks
-
-- **React/Next.js**: useEffect dependencies, event handler naming, React.memo usage
-- **Vue/Nuxt**: v-for key usage, computed properties, watcher optimizations
-- **Astro**: Island architecture, hydration strategies
-- **Remix**: Data loading patterns, routing optimizations
 
 ## License
 
