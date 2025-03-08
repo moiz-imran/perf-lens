@@ -66,41 +66,74 @@ program
       console.log(chalk.gray('─'.repeat(50)));
 
       // Static Analysis
-      const spinner = ora('Running static code analysis...').start();
       const results = await analyzeProject();
-      spinner.succeed('Static analysis complete');
 
-      // Lighthouse Analysis
-      spinner.start("Running Lighthouse audit...");
-      const lhResults = await runLighthouse();
-      spinner.succeed("Lighthouse audit complete");
+      // Group issues by severity for display
+      const issues = results.split('\n');
+      const critical = issues.filter(i => i.includes('🚨'));
+      const warnings = issues.filter(i => i.includes('⚠️'));
+      const suggestions = issues.filter(i => i.includes('💡'));
 
       console.log('\n' + chalk.blue.bold('📊 Performance Analysis Results'));
       console.log(chalk.gray('─'.repeat(50)));
-      console.log(results);
 
-      console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Metrics'));
-      console.log(chalk.gray('─'.repeat(50)));
-      console.log(lhResults);
+      if (issues.length === 1 && issues[0] === '✅ No issues found') {
+        console.log(chalk.green('✨ No issues found! Your code looks great.'));
+      } else {
+        console.log(`Found ${chalk.red(critical.length.toString())} critical, ${chalk.yellow(warnings.length.toString())} warnings, and ${chalk.blue(suggestions.length.toString())} suggestions.\n`);
 
-      // AI Analysis
-      spinner.start("Generating detailed optimization recommendations...");
-      const allIssues = [
-        ...results.split('\n').filter(line =>
-          line.includes('🚨') ||
-          line.includes('⚠️') ||
-          line.includes('💡')
-        ),
-        ...lhResults.split('\n').filter(Boolean)
-      ];
+        if (critical.length > 0) {
+          console.log(chalk.red.bold('\n🚨 Critical Issues:'));
+          critical.forEach(issue => console.log(issue));
+        }
 
-      const aiFixes = await getAISuggestions(allIssues);
-      spinner.succeed("AI analysis complete");
+        if (warnings.length > 0) {
+          console.log(chalk.yellow.bold('\n⚠️  Warnings:'));
+          warnings.forEach(issue => console.log(issue));
+        }
 
-      console.log('\n' + aiFixes);
+        if (suggestions.length > 0) {
+          console.log(chalk.blue.bold('\n💡 Suggestions:'));
+          suggestions.forEach(issue => console.log(issue));
+        }
+      }
 
+      // Lighthouse Analysis
+      const mainSpinner = ora('Running Lighthouse audit...').start();
+      try {
+        // Stop the main spinner before running Lighthouse (which has its own prompts)
+        mainSpinner.stop();
+
+        const lhResults = await runLighthouse();
+        console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Metrics'));
+        console.log(chalk.gray('─'.repeat(50)));
+        console.log(lhResults);
+
+        // AI Analysis
+        mainSpinner.start('Generating detailed optimization recommendations...');
+        const allIssues = [
+          ...issues.filter(line =>
+            line.includes('🚨') ||
+            line.includes('⚠️') ||
+            line.includes('💡')
+          ),
+          ...lhResults.split('\n').filter(Boolean)
+        ];
+
+        const aiFixes = await getAISuggestions(allIssues);
+        mainSpinner.succeed('AI analysis complete');
+
+        console.log('\n' + aiFixes);
+      } catch (lhError) {
+        mainSpinner.fail('Lighthouse audit failed');
+        if (lhError instanceof Error && lhError.message.includes('No development server detected')) {
+          console.log(lhError.message);
+        } else {
+          throw lhError;
+        }
+      }
     } catch (err) {
-      console.error(chalk.red("\n❌ Error:"), (err as Error).message);
+      console.error(chalk.red('\n❌ Error:'), (err as Error).message);
       process.exit(1);
     }
   });
