@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import inquirer from "inquirer";
+import ora from "ora";
 
 interface PackageJson {
   dependencies?: Record<string, string>;
@@ -165,7 +166,7 @@ function getFrameworkSpecificChecks(projectInfo: ProjectInfo, filePath: string, 
         }
 
         // Check for object dependencies
-        const hasObjectDeps = /useEffect\([^,]+,\s*\[[^\]]*\{[^\]]*\][^\]]*\]/g.test(content);
+        const hasObjectDeps = /useEffect\([^,]+,\s*\[[^\]]*\{[^\]]*\}[^}]*\]/g.test(content);
         if (hasObjectDeps) {
           issues.push(`⚠️ Object/array dependencies in useEffect in ${fileName} - Use primitive values or useMemo`);
         }
@@ -570,170 +571,120 @@ function findSourceDirectory(): string {
   return cwd;
 }
 
-export async function analyzeProject(): Promise<string> {
-  console.clear();
-  console.log(chalk.blue.bold('\n🚀 PerfLens Performance Scanner'));
-  console.log(chalk.gray('─'.repeat(50)));
-
-  let srcPath: string;
+async function analyzeFile(filePath: string, projectInfo: ProjectInfo): Promise<string[]> {
   try {
-    srcPath = findSourceDirectory();
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return getFrameworkSpecificChecks(projectInfo, filePath, content);
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to analyze project: ${error.message}`);
-    }
-    throw error;
+    console.error(`Error analyzing ${filePath}:`, error);
+    return [];
   }
+}
 
-  console.log(chalk.gray(`Analyzing directory: ${path.relative(process.cwd(), srcPath)}`));
+async function* findFiles(dir: string): AsyncGenerator<string> {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-  let issues: string[] = [];
-  let projectInfo: ProjectInfo = {
-    framework: 'unknown',
-    isTypeScript: false,
-    features: {
-      hasTailwind: false,
-      hasSSR: false,
-      hasSSG: false,
-      hasTesting: false,
-      hasStateManagement: false,
-      hasRouting: false,
-      hasStyling: false
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      // Skip node_modules and other common exclude directories
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') {
+        continue;
+      }
+      yield* findFiles(fullPath);
+    } else if (entry.isFile() && /\.(js|jsx|ts|tsx|vue|astro)$/.test(entry.name)) {
+      yield fullPath;
     }
-  };
+  }
+}
 
+export async function analyzeProject(): Promise<string> {
   try {
-    // First try to detect framework from package.json
-    const packageJsonPath = path.join(process.cwd(), "package.json");
-    const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-    const detectedInfo = detectFramework(packageJson);
+    // Initial project analysis
+    const spinner = ora('Analyzing project structure...').start();
+    let packageJson: PackageJson = {};
 
-    console.log(chalk.blue('\n📦 Project Detection'));
-    console.log(chalk.gray('─'.repeat(30)));
+    try {
+      const packageJsonContent = fs.readFileSync('package.json', 'utf-8');
+      packageJson = JSON.parse(packageJsonContent);
+    } catch (error) {
+      spinner.warn('No package.json found, continuing with limited analysis');
+    }
 
-    // If framework is unknown or user wants to override, prompt for framework
-    if (detectedInfo.framework === 'unknown') {
-      console.log(chalk.yellow("ℹ️  No framework detected in package.json"));
+    let projectInfo = detectFramework(packageJson);
+    spinner.succeed(`Detected ${projectInfo.framework}${projectInfo.version ? ` v${projectInfo.version}` : ''}`);
+
+    // Stop spinner before prompts
+    spinner.stop();
+
+    // Framework selection
+    if (projectInfo.framework === 'unknown') {
       projectInfo.framework = await promptForFramework();
     } else {
-      console.log(chalk.green(`✓ Detected ${detectedInfo.framework}`));
       const { override } = await inquirer.prompt([
         {
-          type: 'confirm',
+          type: 'list',
           name: 'override',
-          message: 'Would you like to select a different framework?',
-          default: false
+          message: 'Framework Detection',
+          choices: [
+            { name: `Continue with detected framework (${projectInfo.framework})`, value: false },
+            { name: 'Select a different framework', value: true }
+          ]
         }
       ]);
 
       if (override) {
-        projectInfo.framework = await promptForFramework();
-      } else {
-        projectInfo.framework = detectedInfo.framework;
+        const { framework } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'framework',
+            message: 'Select your framework:',
+            choices: ['react', 'next.js', 'vue', 'nuxt', 'astro', 'remix']
+          }
+        ]);
+        projectInfo.framework = framework as Framework;
       }
     }
 
-    // Prompt for features
+    // Features selection
     projectInfo = await promptForFeatures(projectInfo);
 
-    console.log(chalk.blue('\n📊 Project Configuration'));
-    console.log(chalk.gray('─'.repeat(30)));
-    console.log(chalk.bold('Framework:'), chalk.green(projectInfo.framework), projectInfo.version || '');
-    console.log(chalk.bold('TypeScript:'), projectInfo.isTypeScript ? chalk.green('Yes') : chalk.gray('No'));
+    // Start analysis spinner
+    spinner.start('Running static code analysis...');
+    const issues: string[] = [];
+    let filesAnalyzed = 0;
+    const startTime = Date.now();
+    const TIMEOUT = 30000; // 30 seconds timeout
 
-    console.log(chalk.bold('\nFeatures:'));
-    const features = [
-      ['SSR', projectInfo.features.hasSSR],
-      ['SSG', projectInfo.features.hasSSG],
-      ['Testing', projectInfo.features.hasTesting],
-      ['State Management', projectInfo.features.hasStateManagement],
-      ['Routing', projectInfo.features.hasRouting],
-      ['Styling', projectInfo.features.hasStyling],
-      ['Tailwind', projectInfo.features.hasTailwind]
-    ];
+    for await (const filePath of findFiles('src')) {
+      if (Date.now() - startTime > TIMEOUT) {
+        spinner.warn('Analysis taking too long, showing partial results');
+        break;
+      }
 
-    // Display features in two columns
-    for (let i = 0; i < features.length; i += 2) {
-      const col1 = `${features[i][0]}: ${features[i][1] ? chalk.green('✓') : chalk.gray('✗')}`;
-      const col2 = features[i + 1] ? `${features[i + 1][0]}: ${features[i + 1][1] ? chalk.green('✓') : chalk.gray('✗')}` : '';
-      console.log(`  ${col1.padEnd(25)}${col2}`);
+      const fileIssues = await analyzeFile(filePath, projectInfo);
+      issues.push(...fileIssues);
+      filesAnalyzed++;
+
+      if (filesAnalyzed % 10 === 0) {
+        spinner.text = `Analyzed ${filesAnalyzed} files...`;
+      }
     }
 
-    console.log(chalk.blue('\n🔍 Running Analysis'));
-    console.log(chalk.gray('─'.repeat(30)));
-
-    // Analyze dependencies first
-    console.log(chalk.gray('Checking dependencies...'));
+    // Add dependency analysis
     const dependencyIssues = scanDependencies(packageJson, projectInfo);
     issues.push(...dependencyIssues);
 
+    spinner.succeed(`Analysis complete - ${filesAnalyzed} files checked`);
+
+    if (issues.length === 0) {
+      return '✅ No issues found';
+    }
+
+    return issues.join('\n');
   } catch (error) {
-    console.log(chalk.yellow("\n⚠️  Could not read package.json"));
-    projectInfo.framework = await promptForFramework();
-    projectInfo = await promptForFeatures(projectInfo);
+    console.error('Error during analysis:', error);
+    throw new Error('Failed to analyze project');
   }
-
-  // Scan files with progress tracking
-  let filesScanned = 0;
-  let totalFiles = 0;
-
-  // Count total files first
-  function countFiles(dir: string) {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) {
-        countFiles(filePath);
-      } else if (/\.(js|jsx|ts|tsx|vue)$/.test(file)) {
-        totalFiles++;
-      }
-    }
-  }
-
-  countFiles(srcPath);
-
-  // Now scan with progress
-  function scanDir(dir: string) {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-
-      if (stat.isDirectory()) {
-        scanDir(filePath);
-      } else if (/\.(js|jsx|ts|tsx|vue)$/.test(file)) {
-        filesScanned++;
-        process.stdout.write(`\rAnalyzing files... ${filesScanned}/${totalFiles} (${Math.round((filesScanned/totalFiles) * 100)}%)`);
-        const fileIssues = scanFile(filePath, projectInfo);
-        issues.push(...fileIssues);
-      }
-    }
-  }
-
-  scanDir(srcPath);
-  console.log(); // New line after progress
-
-  if (issues.length === 0) {
-    return chalk.green("\n✨ No issues found! Your code looks great.");
-  }
-
-  // Group issues by severity
-  const critical = issues.filter(i => i.includes('🚨'));
-  const warnings = issues.filter(i => i.includes('⚠️'));
-  const suggestions = issues.filter(i => i.includes('💡'));
-
-  console.log(chalk.blue('\n📝 Analysis Results'));
-  console.log(chalk.gray('─'.repeat(30)));
-
-  return [
-    `Found ${chalk.red(critical.length.toString())} critical, ${chalk.yellow(warnings.length.toString())} warnings, and ${chalk.blue(suggestions.length.toString())} suggestions.\n`,
-    critical.length > 0 ? chalk.red.bold('\n🚨 Critical Issues:') : '',
-    ...critical,
-    warnings.length > 0 ? chalk.yellow.bold('\n⚠️  Warnings:') : '',
-    ...warnings,
-    suggestions.length > 0 ? chalk.blue.bold('\n💡 Suggestions:') : '',
-    ...suggestions,
-    '\n' + chalk.gray('─'.repeat(50))
-  ].join('\n');
 }
