@@ -1,4 +1,4 @@
-import lighthouse from "lighthouse";
+import lighthouse, { type Result } from "lighthouse";
 import * as chromeLauncher from 'chrome-launcher';
 import { Flags } from 'lighthouse';
 import axios from 'axios';
@@ -275,7 +275,7 @@ ${analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n')}`;
   }
 }
 
-export async function runLighthouse(): Promise<{ metrics: string, fullReport: any, analysis: string }> {
+export async function runLighthouse(): Promise<{ metrics: string, fullReport: Result, analysis: string }> {
   // Check for running dev server
   const port = await findDevServer();
   if (!port) {

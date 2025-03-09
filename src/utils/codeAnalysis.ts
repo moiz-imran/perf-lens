@@ -37,6 +37,10 @@ interface AnalysisConfig {
   maxFileSize: number;      // in bytes
   batchDelayMs: number;     // delay between batches to avoid rate limits
   maxTokensPerBatch: number;// maximum tokens per API call
+  lighthouseContext?: {     // optional lighthouse context
+    metrics: string;
+    analysis: string;
+  };
 }
 
 const DEFAULT_CONFIG: AnalysisConfig = {
@@ -44,7 +48,7 @@ const DEFAULT_CONFIG: AnalysisConfig = {
   maxTotalFiles: 200,       // Can analyze up to 200 files total
   maxFileSize: 100 * 1024,  // 100KB
   batchDelayMs: 1000,       // 1 second delay between batches
-  maxTokensPerBatch: 100000 // ~100KB of text (conservative estimate for token conversion)
+  maxTokensPerBatch: 100000 // ~100KB of text
 };
 
 // Priority scoring for files
@@ -230,6 +234,17 @@ async function analyzeFileGroup(
   // Create a detailed prompt for the LLM
   const prompt = `You are a performance optimization expert specializing in frontend web development.
 I need you to analyze the following ${groupName} files for performance issues and optimization opportunities.
+
+${config.lighthouseContext ? `
+LIGHTHOUSE CONTEXT:
+Performance Metrics:
+${config.lighthouseContext.metrics}
+
+Analysis:
+${config.lighthouseContext.analysis}
+
+Use the above Lighthouse insights to guide your code analysis. Look for specific code patterns that might be causing the performance issues identified by Lighthouse.
+` : ''}
 
 Here are the ONLY files you can reference in your analysis:
 ${filesToAnalyze.map(file => {
@@ -534,88 +549,4 @@ export async function analyzeCodebase(customConfig?: Partial<AnalysisConfig>): P
 
   // Process files in batches with prioritization
   return processBatchedFiles(allFiles, config, openai);
-}
-
-/**
- * Generate a comprehensive performance report by combining code analysis and Lighthouse results
- */
-export async function generatePerformanceReport(
-  codeAnalysis: CodeAnalysisResult,
-  lighthouseResults: string
-): Promise<string> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "OpenAI API key not found! Please set it using:\n" +
-      "perf-lens config set-key YOUR_API_KEY\n" +
-      "Or set the OPENAI_API_KEY environment variable."
-    );
-  }
-
-  const openai = new OpenAI({ apiKey });
-  const spinner = ora('Generating comprehensive performance report...').start();
-
-  // Get the actual file paths that were analyzed
-  const actualFilePaths = Object.keys(codeAnalysis.fileSpecificIssues);
-  const filePathsString = actualFilePaths.map(file => {
-    const relativePath = path.relative(process.cwd(), file);
-    return `- \`${relativePath}\``;
-  }).join('\n');
-
-  // Create a detailed prompt for the LLM
-  const prompt = `You are a performance optimization expert for frontend web applications.
-I need you to create a comprehensive performance report by analyzing both static code issues and Lighthouse results.
-
-## Code Analysis Results:
-Critical Issues:
-${codeAnalysis.critical.join('\n')}
-
-Warnings:
-${codeAnalysis.warnings.join('\n')}
-
-Suggestions:
-${codeAnalysis.suggestions.join('\n')}
-
-## Lighthouse Results:
-${lighthouseResults}
-
-## Actual Files Analyzed:
-${filePathsString}
-
-Based on both the code analysis and Lighthouse results, create a comprehensive performance optimization report that:
-
-1. Summarizes the most critical performance issues that should be addressed immediately
-2. Provides a file-by-file breakdown of issues, ordered by severity
-3. For each issue, includes:
-   - Issue type (CRITICAL/WARNING/SUGGESTION)
-   - Description of the problem
-   - Exact location (file and line numbers where available)
-   - Explanation of performance impact
-   - Recommended solution with code example if applicable
-4. Suggests a prioritized action plan for addressing the issues
-5. Estimates the potential performance improvements that could be achieved
-
-IMPORTANT: ONLY reference files that are in the "Actual Files Analyzed" list. DO NOT mention or reference any files that are not in this list. If you're unsure about a specific file, refer to it by its general purpose rather than a specific filename.
-
-Format your response as a well-structured report with clear sections and prioritized recommendations.
-Be specific, actionable, and thorough in your analysis.`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are a performance optimization expert for frontend web applications. Only reference actual files that exist in the project." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 4000,
-    });
-
-    spinner.succeed('Generated comprehensive performance report');
-    return response.choices[0]?.message?.content || '';
-  } catch (error) {
-    spinner.fail('Error generating performance report');
-    console.error(error);
-    return 'Error generating performance report. Please try again.';
-  }
 }
