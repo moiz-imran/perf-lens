@@ -4,10 +4,14 @@ AI-powered frontend performance optimizer that analyzes your React, Vue, or othe
 
 ## Features
 
-- 🔍 AI-Powered Code Analysis
-- 📊 Lighthouse Performance Metrics
-- 🤖 Comprehensive Performance Reports
-- 🚀 Actionable Optimization Recommendations
+- 🔍 AI-Powered Code Analysis with Smart File Prioritization
+- 📊 Lighthouse Performance Metrics with Detailed Breakdown
+- 🤖 Comprehensive Performance Reports with File-Specific Analysis
+- 🚀 Actionable Optimization Recommendations with Code Examples
+- ⚡️ Configurable Analysis Limits and Batch Processing
+- 🎯 Smart Memory Management and Token Optimization
+- 📝 Validated Line-Number References and Code Context
+- 🔄 Framework-Aware Analysis (React, Vue, Svelte, Astro, etc.)
 
 ## Installation
 
@@ -35,23 +39,34 @@ perf-lens config get-key
 
 ## Usage
 
-Run in your frontend project directory:
-
+Basic scan with default settings:
 ```bash
 perf-lens scan
 ```
 
-PerfLens will:
+Advanced usage with custom limits:
+```bash
+perf-lens scan --max-files 100 --batch-size 10 --max-tokens 50000 --delay 2000
+```
 
-1. Analyze your entire codebase for performance issues at the code level
-2. Run Lighthouse to evaluate runtime performance metrics
-3. Generate a detailed report with file-by-file recommendations
-4. Provide actionable code examples for each issue
+Configuration options:
+- `--max-files`: Maximum number of files to analyze (default: 200)
+- `--batch-size`: Number of files per batch (default: 20)
+- `--max-tokens`: Maximum tokens per API call (default: 100000)
+- `--delay`: Delay between batches in ms (default: 1000)
+- `--max-file-size`: Maximum file size in KB (default: 100)
 
 ## How It Works
 
 PerfLens uses advanced AI to analyze your code for performance issues across various aspects:
 
+### Smart File Prioritization
+- Entry points and important files get higher priority
+- Component files are prioritized for framework-specific analysis
+- Files are analyzed in batches to optimize API usage
+- Intelligent size-based file filtering
+
+### Comprehensive Analysis
 - **Render Performance**: Identifies unnecessary re-renders, expensive calculations in render methods
 - **Bundle Size**: Detects large dependencies and code splitting opportunities
 - **Memory Usage**: Finds memory leaks and inefficient memory patterns
@@ -60,7 +75,8 @@ PerfLens uses advanced AI to analyze your code for performance issues across var
 - **JavaScript Performance**: Identifies inefficient algorithms and unnecessary work
 - **Asset Optimization**: Suggests improvements for images, fonts, and other assets
 
-The tool supports all major frontend frameworks and libraries:
+### Framework Support
+The tool provides specialized analysis for all major frontend frameworks and libraries:
 - React and Next.js
 - Vue and Nuxt
 - Svelte and SvelteKit
@@ -68,6 +84,13 @@ The tool supports all major frontend frameworks and libraries:
 - Astro
 - Remix
 - And more!
+
+### Report Generation
+- File-by-file breakdown of issues
+- Validated line number references with code context
+- Prioritized action items with estimated improvements
+- Detailed solutions with code examples
+- Combined analysis of static code and runtime performance
 
 ## Requirements
 
