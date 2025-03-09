@@ -77,13 +77,9 @@ program
         mainSpinner.stop();
         lhResults = await runLighthouse();
 
-        console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Metrics'));
+        console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Report'));
         console.log(chalk.gray('─'.repeat(50)));
         console.log(lhResults.metrics);
-
-        console.log('\n' + chalk.blue.bold('🔍 AI Analysis of Lighthouse Results'));
-        console.log(chalk.gray('─'.repeat(50)));
-        console.log(lhResults.analysis);
       } catch (lhError) {
         mainSpinner.fail('Lighthouse audit failed');
         if (lhError instanceof Error && lhError.message.includes('No development server detected')) {
@@ -94,15 +90,19 @@ program
         return;
       }
 
-      // Step 2: AI-powered code analysis
+      // Step 2: Code analysis with Lighthouse context
       console.log('\n' + chalk.blue.bold('🧠 AI-Powered Code Analysis'));
       console.log(chalk.gray('─'.repeat(50)));
-      console.log(chalk.gray('Analyzing your codebase for performance optimizations...'));
+      console.log(chalk.gray('Analyzing your codebase with Lighthouse insights...'));
 
-      let codeAnalysisResults;
       try {
-        // Regular code analysis
-        codeAnalysisResults = await analyzeCodebase(config);
+        const codeAnalysisResults = await analyzeCodebase({
+          ...config,
+          lighthouseContext: {
+            metrics: lhResults.metrics,
+            analysis: lhResults.analysis,
+          }
+        });
 
         const totalIssues =
           codeAnalysisResults.critical.length +
@@ -110,10 +110,6 @@ program
           codeAnalysisResults.suggestions.length;
 
         console.log(`\nAI found ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`);
-
-        // Print regular code analysis results
-        console.log(chalk.blue.bold('\n📊 Standard Code Analysis Results:'));
-        console.log(chalk.gray('─'.repeat(50)));
 
         if (codeAnalysisResults.critical.length > 0) {
           console.log(chalk.red.bold('\n🚨 Critical Code Issues:'));
@@ -130,41 +126,12 @@ program
           codeAnalysisResults.suggestions.forEach(issue => console.log(issue));
         }
 
-        // Step 3: Code analysis with Lighthouse context
-        console.log('\n' + chalk.blue.bold('🔄 Code Analysis Based on Lighthouse Insights'));
-        console.log(chalk.gray('─'.repeat(50)));
-
-        const lighthouseBasedAnalysis = await analyzeCodebase({
-          ...config,
-          lighthouseContext: {
-            metrics: lhResults.metrics,
-            analysis: lhResults.analysis
-          }
-        });
-
-        // Print Lighthouse-informed code analysis
-        if (lighthouseBasedAnalysis.critical.length > 0) {
-          console.log(chalk.red.bold('\n🚨 Critical Issues (Lighthouse Context):'));
-          lighthouseBasedAnalysis.critical.forEach(issue => console.log(issue));
-        }
-
-        if (lighthouseBasedAnalysis.warnings.length > 0) {
-          console.log(chalk.yellow.bold('\n⚠️  Warnings (Lighthouse Context):'));
-          lighthouseBasedAnalysis.warnings.forEach(issue => console.log(issue));
-        }
-
-        if (lighthouseBasedAnalysis.suggestions.length > 0) {
-          console.log(chalk.blue.bold('\n💡 Suggestions (Lighthouse Context):'));
-          lighthouseBasedAnalysis.suggestions.forEach(issue => console.log(issue));
-        }
-
         // Final summary
         console.log('\n' + chalk.blue.bold('✨ Analysis Complete'));
         console.log(chalk.gray('─'.repeat(50)));
-        console.log(chalk.gray('Review the three reports above for a complete understanding of your application\'s performance:'));
-        console.log(chalk.blue('1. 🌟 Lighthouse Performance Metrics and Insights'));
-        console.log(chalk.blue('2. 📊 Standard Code Analysis'));
-        console.log(chalk.blue('3. 🔄 Code Analysis Based on Lighthouse Insights'));
+        console.log(chalk.gray('Review the two reports above for a complete understanding of your application\'s performance:'));
+        console.log(chalk.blue('1. 🌟 Lighthouse Performance Report - Runtime metrics and opportunities'));
+        console.log(chalk.blue('2. 🧠 Code Analysis - Specific code-level improvements based on Lighthouse insights'));
 
       } catch (error) {
         console.error(chalk.red('Error during AI code analysis:'), error);

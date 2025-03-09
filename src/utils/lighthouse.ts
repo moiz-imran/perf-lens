@@ -9,6 +9,31 @@ import ora from 'ora';
 import { OpenAI } from 'openai';
 import { getApiKey } from './ai.js';
 
+// Add type definitions for Lighthouse audit details
+interface AuditItem {
+  url: string;
+  wastedMs?: number;
+  wastedBytes?: number;
+  transferSize?: number;
+  resourceType?: string;
+}
+
+interface AuditDetails {
+  type: string;
+  items?: AuditItem[];
+  [key: string]: any;
+}
+
+interface LighthouseAudit {
+  id: string;
+  title: string;
+  description: string;
+  score: number | null;
+  displayValue?: string;
+  details?: AuditDetails;
+  [key: string]: any;
+}
+
 const COMMON_DEV_PORTS = [3000, 3001, 5173, 8080, 4321, 4000];
 
 async function findPortInPackageJson(): Promise<number | null> {
@@ -114,7 +139,104 @@ async function findDevServer(): Promise<number | null> {
   return null;
 }
 
-async function analyzeLighthouseReport(report: any): Promise<string> {
+/**
+ * Format Lighthouse metrics into a readable report
+ */
+function formatLighthouseReport(report: Result): string {
+  const metrics = report.audits as Record<string, LighthouseAudit>;
+  const score = (report.categories.performance?.score || 0) * 100;
+
+  let output = `Performance Score: ${score.toFixed(0)}%\n\n`;
+
+  // Core Web Vitals
+  output += chalk.blue.bold('Core Web Vitals:\n');
+  output += `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n`;
+  output += `Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}\n`;
+  output += `Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}\n`;
+  output += `Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}\n`;
+  output += `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}\n`;
+  output += `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n\n`;
+
+  // Performance Opportunities
+  const renderBlockingResources = metrics['render-blocking-resources']?.details?.items || [];
+  if (renderBlockingResources.length > 0) {
+    output += chalk.yellow.bold('Performance Opportunities:\n');
+    output += `• Render Blocking Resources: ${metrics['render-blocking-resources']?.displayValue}\n`;
+    renderBlockingResources.forEach((item: AuditItem) => {
+      output += `  - ${item.url}: ${item.wastedMs}ms\n`;
+    });
+    output += '\n';
+  }
+
+  // JavaScript Analysis
+  const unusedJs = metrics['unused-javascript']?.details?.items || [];
+  const unminifiedJs = metrics['unminified-javascript']?.details?.items || [];
+  if (unusedJs.length > 0 || unminifiedJs.length > 0) {
+    output += chalk.yellow.bold('JavaScript Issues:\n');
+    if (unusedJs.length > 0) {
+      output += '• Unused JavaScript:\n';
+      unusedJs.forEach((item: AuditItem) => {
+        output += `  - ${item.url}: ${item.wastedBytes} bytes unused\n`;
+      });
+    }
+    if (unminifiedJs.length > 0) {
+      output += '• Unminified JavaScript:\n';
+      unminifiedJs.forEach((item: AuditItem) => {
+        output += `  - ${item.url}: Could save ${item.wastedBytes} bytes\n`;
+      });
+    }
+    output += '\n';
+  }
+
+  // CSS Analysis
+  const unusedCss = metrics['unused-css-rules']?.details?.items || [];
+  const unminifiedCss = metrics['unminified-css']?.details?.items || [];
+  if (unusedCss.length > 0 || unminifiedCss.length > 0) {
+    output += chalk.yellow.bold('CSS Issues:\n');
+    if (unusedCss.length > 0) {
+      output += '• Unused CSS Rules:\n';
+      unusedCss.forEach((item: AuditItem) => {
+        output += `  - ${item.url}: ${item.wastedBytes} bytes unused\n`;
+      });
+    }
+    if (unminifiedCss.length > 0) {
+      output += '• Unminified CSS:\n';
+      unminifiedCss.forEach((item: AuditItem) => {
+        output += `  - ${item.url}: Could save ${item.wastedBytes} bytes\n`;
+      });
+    }
+    output += '\n';
+  }
+
+  // Network Analysis
+  const networkRequests = metrics['network-requests']?.details?.items || [];
+  if (networkRequests.length > 0) {
+    output += chalk.yellow.bold('Network Analysis:\n');
+    const totalBytes = networkRequests.reduce((acc: number, item: AuditItem) => acc + (item.transferSize || 0), 0);
+    output += `Total Transfer Size: ${(totalBytes / 1024).toFixed(2)}KB\n`;
+
+    // Group by resource type
+    const byType = networkRequests.reduce((acc: Record<string, number>, item: AuditItem) => {
+      if (item.resourceType) {
+        acc[item.resourceType] = (acc[item.resourceType] || 0) + (item.transferSize || 0);
+      }
+      return acc;
+    }, {});
+
+    output += 'Resource Breakdown:\n';
+    Object.entries(byType).forEach(([type, size]) => {
+      output += `  - ${type}: ${(size / 1024).toFixed(2)}KB\n`;
+    });
+    output += '\n';
+  }
+
+  return output;
+}
+
+/**
+ * Analyze Lighthouse report with AI
+ */
+async function analyzeLighthouseReport(report: Result): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error(
@@ -223,59 +345,13 @@ Be specific about the impact of each issue and the potential benefits of fixing 
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  // Generate executive summary
-  spinner.text = 'Generating executive summary...';
+  spinner.succeed('Lighthouse analysis complete');
 
-  const summaryPrompt = `You are a performance optimization expert for frontend web applications.
-Please create an executive summary of the Lighthouse performance analysis.
-
-Overall Performance Score: ${(report.categories.performance?.score || 0) * 100}%
-
-Previous Section Analyses:
-${analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n')}
-
-Please provide:
-1. A brief executive summary of the most critical performance issues
-2. Top 3-5 highest impact recommendations
-3. Estimated potential performance improvements
-
-Keep this summary concise and focused on the most important findings.`;
-
-  try {
-    const summaryResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are a performance optimization expert specializing in Lighthouse performance analysis." },
-        { role: "user", content: summaryPrompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 1000,
-    });
-
-    const executiveSummary = summaryResponse.choices[0]?.message?.content || '';
-
-    spinner.succeed('Lighthouse analysis complete');
-
-    // Combine all analyses into a well-formatted report
-    return `# Lighthouse Performance Analysis
-
-## Executive Summary
-${executiveSummary}
-
-${analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n')}`;
-
-  } catch (error) {
-    spinner.fail('Error generating executive summary');
-    console.error(error);
-
-    // Return the section analyses without an executive summary
-    return `# Lighthouse Performance Analysis
-
-${analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n')}`;
-  }
+  // Return the section analyses
+  return analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n');
 }
 
-export async function runLighthouse(): Promise<{ metrics: string, fullReport: Result, analysis: string }> {
+export async function runLighthouse(): Promise<{ metrics: string, report: string, analysis: string, fullReport: Result }> {
   // Check for running dev server
   const port = await findDevServer();
   if (!port) {
@@ -316,6 +392,9 @@ export async function runLighthouse(): Promise<{ metrics: string, fullReport: Re
     const report = runnerResult.lhr;
     await chrome.kill();
 
+    const formattedReport = formatLighthouseReport(report);
+    const analysis = await analyzeLighthouseReport(report);
+
     const score = (report.categories.performance?.score || 0) * 100;
     const metrics = report.audits;
 
@@ -325,12 +404,11 @@ export async function runLighthouse(): Promise<{ metrics: string, fullReport: Re
            `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
 
     // Get AI analysis of the full report
-    const analysis = await analyzeLighthouseReport(report);
-
     return {
       metrics: metricsString,
-      fullReport: report,
-      analysis
+      report: formattedReport,
+      analysis,
+      fullReport: report
     };
   } catch (error) {
     await chrome.kill();
