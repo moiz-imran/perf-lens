@@ -4,14 +4,23 @@ AI-powered frontend performance optimizer that analyzes your React, Vue, or othe
 
 ## Features
 
-- 🔍 AI-Powered Code Analysis with Smart File Prioritization
-- 📊 Lighthouse Performance Metrics with Detailed Breakdown
-- 🤖 Comprehensive Performance Reports with File-Specific Analysis
-- 🚀 Actionable Optimization Recommendations with Code Examples
-- ⚡️ Configurable Analysis Limits and Batch Processing
-- 🎯 Smart Memory Management and Token Optimization
-- 📝 Validated Line-Number References and Code Context
-- 🔄 Framework-Aware Analysis (React, Vue, Svelte, Astro, etc.)
+- 🌟 Comprehensive Lighthouse Performance Analysis
+  - Core Web Vitals Metrics
+  - Performance Opportunities
+  - JavaScript and CSS Analysis
+  - Network Performance Breakdown
+- 🧠 AI-Powered Code Analysis with Lighthouse Context
+  - Smart File Prioritization
+  - Token-Optimized Processing
+  - Framework-Aware Analysis
+- 📊 Detailed Performance Reports
+  - Runtime Performance Metrics
+  - Code-Level Optimization Suggestions
+  - Actionable Recommendations
+- ⚡️ Smart Batch Processing
+  - Configurable Analysis Limits
+  - Automatic Token Management
+  - Efficient Memory Usage
 
 ## Installation
 
@@ -46,56 +55,71 @@ perf-lens scan
 
 Advanced usage with custom limits:
 ```bash
-perf-lens scan --max-files 100 --batch-size 10 --max-tokens 50000 --delay 2000
+perf-lens scan --max-files 50 --batch-size 10 --max-tokens 60000
 ```
 
-Configuration options:
-- `--max-files`: Maximum number of files to analyze (default: 200)
-- `--batch-size`: Number of files per batch (default: 20)
-- `--max-tokens`: Maximum tokens per API call (default: 100000)
-- `--delay`: Delay between batches in ms (default: 1000)
-- `--max-file-size`: Maximum file size in KB (default: 100)
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--max-files` | Maximum number of files to analyze | 200 |
+| `--batch-size` | Number of files per batch | 20 |
+| `--max-size` | Maximum file size in KB | 100 |
+| `--batch-delay` | Delay between batches in ms | 1000 |
+| `--max-tokens` | Maximum tokens per batch | 100000 |
 
 ## How It Works
 
-PerfLens uses advanced AI to analyze your code for performance issues across various aspects:
+PerfLens combines Lighthouse performance audits with AI-powered code analysis to provide comprehensive performance insights:
 
-### Smart File Prioritization
-- Entry points and important files get higher priority
-- Component files are prioritized for framework-specific analysis
-- Files are analyzed in batches to optimize API usage
-- Intelligent size-based file filtering
+### 1. Lighthouse Analysis
+- Runs performance audits on your development server
+- Analyzes Core Web Vitals and key metrics
+- Identifies performance bottlenecks
+- Provides detailed breakdown of:
+  - JavaScript and CSS issues
+  - Resource loading optimization
+  - Network performance
+  - Asset optimization opportunities
 
-### Comprehensive Analysis
-- **Render Performance**: Identifies unnecessary re-renders, expensive calculations in render methods
-- **Bundle Size**: Detects large dependencies and code splitting opportunities
-- **Memory Usage**: Finds memory leaks and inefficient memory patterns
-- **Network Performance**: Highlights excessive API calls and inefficient data fetching
-- **CSS Performance**: Detects complex selectors and layout thrashing
-- **JavaScript Performance**: Identifies inefficient algorithms and unnecessary work
-- **Asset Optimization**: Suggests improvements for images, fonts, and other assets
+### 2. AI-Powered Code Analysis
+- Analyzes your codebase with Lighthouse context
+- Prioritizes files based on:
+  - Entry points and key components
+  - Framework-specific patterns
+  - File size and complexity
+- Processes files in optimized batches to manage:
+  - Token limits
+  - Memory usage
+  - API rate limits
 
-### Framework Support
-The tool provides specialized analysis for all major frontend frameworks and libraries:
+### 3. Framework Support
+Specialized analysis for:
 - React and Next.js
 - Vue and Nuxt
 - Svelte and SvelteKit
 - Angular
 - Astro
-- Remix
 - And more!
 
-### Report Generation
-- File-by-file breakdown of issues
-- Validated line number references with code context
-- Prioritized action items with estimated improvements
-- Detailed solutions with code examples
-- Combined analysis of static code and runtime performance
+### 4. Output Format
+Two comprehensive reports:
+1. 🌟 Lighthouse Performance Report
+   - Runtime metrics and scores
+   - Performance opportunities
+   - Resource optimization suggestions
+
+2. 🧠 Code Analysis Report
+   - Critical issues
+   - Warnings
+   - Improvement suggestions
+   - File-specific recommendations
 
 ## Requirements
 
 - Node.js >= 18
-- OpenAI API Key (set as OPENAI_API_KEY in your environment)
+- Running development server
+- OpenAI API Key
 
 ## License
 
