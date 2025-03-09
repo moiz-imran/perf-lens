@@ -41,20 +41,43 @@ program
 program
   .command("scan")
   .description("Scan your frontend UI for performance issues")
-  .action(async () => {
+  .option('--max-files <number>', 'Maximum total number of files to analyze', '200')
+  .option('--batch-size <number>', 'Number of files to analyze per batch', '20')
+  .option('--max-size <number>', 'Maximum file size in KB to analyze', '100')
+  .option('--batch-delay <number>', 'Delay between batches in milliseconds', '1000')
+  .option('--max-tokens <number>', 'Maximum tokens per batch (affects how much code can be analyzed at once)', '100000')
+  .action(async (options) => {
     try {
       console.clear();
       console.log(chalk.blue.bold('🔍 PerfLens Performance Scanner'));
       console.log(chalk.gray('─'.repeat(50)));
+
+      // Parse configuration options
+      const config = {
+        maxTotalFiles: parseInt(options.maxFiles),
+        maxFilesPerBatch: parseInt(options.batchSize),
+        maxFileSize: parseInt(options.maxSize) * 1024, // Convert KB to bytes
+        batchDelayMs: parseInt(options.batchDelay),
+        maxTokensPerBatch: parseInt(options.maxTokens)
+      };
 
       // AI-powered code analysis
       console.log(chalk.blue.bold('🧠 AI-Powered Code Analysis'));
       console.log(chalk.gray('─'.repeat(50)));
       console.log(chalk.gray('Analyzing your codebase for performance optimizations...'));
 
+      // Print analysis configuration
+      console.log(chalk.blue.bold('\nAnalysis Configuration:'));
+      console.log(`Maximum files to analyze: ${chalk.yellow(config.maxTotalFiles)}`);
+      console.log(`Files per batch: ${chalk.yellow(config.maxFilesPerBatch)}`);
+      console.log(`Maximum file size: ${chalk.yellow(options.maxSize)}KB`);
+      console.log(`Batch delay: ${chalk.yellow(config.batchDelayMs)}ms`);
+      console.log(`Maximum tokens per batch: ${chalk.yellow(config.maxTokensPerBatch)}`);
+      console.log(chalk.gray('─'.repeat(50)));
+
       let codeAnalysisResults;
       try {
-        codeAnalysisResults = await analyzeCodebase();
+        codeAnalysisResults = await analyzeCodebase(config);
 
         const totalIssues =
           codeAnalysisResults.critical.length +
@@ -91,7 +114,12 @@ program
         const lhResults = await runLighthouse();
         console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Metrics'));
         console.log(chalk.gray('─'.repeat(50)));
-        console.log(lhResults);
+        console.log(lhResults.metrics);
+
+        // Display AI analysis of Lighthouse results
+        console.log('\n' + chalk.blue.bold('🔍 AI Analysis of Lighthouse Results'));
+        console.log(chalk.gray('─'.repeat(50)));
+        console.log(lhResults.analysis);
 
         // Generate comprehensive report
         if (codeAnalysisResults) {
@@ -99,7 +127,7 @@ program
           console.log(chalk.gray('─'.repeat(50)));
 
           mainSpinner.start('Generating detailed optimization recommendations...');
-          const comprehensiveReport = await generatePerformanceReport(codeAnalysisResults, lhResults);
+          const comprehensiveReport = await generatePerformanceReport(codeAnalysisResults, lhResults.metrics);
           mainSpinner.succeed('AI analysis complete');
 
           console.log('\n' + comprehensiveReport);
