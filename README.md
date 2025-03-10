@@ -38,6 +38,28 @@ npm install -g perf-lens
 yarn global add perf-lens
 ```
 
+### Project Setup
+
+For project-specific configuration, install PerfLens as a dev dependency:
+
+```bash
+npm install --save-dev perf-lens
+# or
+yarn add -D perf-lens
+```
+
+Add analysis scripts to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "analyze": "perf-lens scan",
+    "analyze:html": "perf-lens scan --output reports/performance.html --format html",
+    "analyze:md": "perf-lens scan --output reports/performance.md"
+  }
+}
+```
+
 ## Usage
 
 ### Basic Analysis
@@ -271,15 +293,15 @@ The ignore patterns from `.perflensignore` are automatically merged with the pat
 
 ### 3. Report Generation
 Generates comprehensive reports with:
-1. Performance Metrics
-   - Core Web Vitals scores
-   - Performance opportunities
-   - Resource usage breakdown
+- Performance Metrics
+  - Core Web Vitals scores
+  - Performance opportunities
+  - Resource usage breakdown
 
-2. Code Analysis
-   - Critical performance issues
-   - Warnings and suggestions
-   - Code-level recommendations
+- Code Analysis
+  - Critical performance issues
+  - Warnings and suggestions
+  - Code-level recommendations
 
 ## Supported File Types
 - JavaScript (\`.js\`, \`.jsx\`)
