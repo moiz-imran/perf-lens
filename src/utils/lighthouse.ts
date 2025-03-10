@@ -146,6 +146,100 @@ function formatLighthouseReport(report: Result): string {
   const metrics = report.audits as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
 
+  let output = `# Performance Score: ${score.toFixed(0)}%\n\n`;
+
+  // Core Web Vitals
+  output += '## Core Web Vitals\n';
+  output += `* First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n`;
+  output += `* Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}\n`;
+  output += `* Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}\n`;
+  output += `* Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}\n`;
+  output += `* Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}\n`;
+  output += `* Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n\n`;
+
+  // Performance Opportunities
+  const renderBlockingResources = metrics['render-blocking-resources']?.details?.items || [];
+  if (renderBlockingResources.length > 0) {
+    output += '## Performance Opportunities\n';
+    output += `### Render Blocking Resources: ${metrics['render-blocking-resources']?.displayValue}\n`;
+    renderBlockingResources.forEach((item: AuditItem) => {
+      output += `* ${item.url}: ${item.wastedMs}ms\n`;
+    });
+    output += '\n';
+  }
+
+  // JavaScript Analysis
+  const unusedJs = metrics['unused-javascript']?.details?.items || [];
+  const unminifiedJs = metrics['unminified-javascript']?.details?.items || [];
+  if (unusedJs.length > 0 || unminifiedJs.length > 0) {
+    output += '## JavaScript Issues\n';
+    if (unusedJs.length > 0) {
+      output += '### Unused JavaScript\n';
+      unusedJs.forEach((item: AuditItem) => {
+        output += `* ${item.url}: ${item.wastedBytes} bytes unused\n`;
+      });
+      output += '\n';
+    }
+    if (unminifiedJs.length > 0) {
+      output += '### Unminified JavaScript\n';
+      unminifiedJs.forEach((item: AuditItem) => {
+        output += `* ${item.url}: Could save ${item.wastedBytes} bytes\n`;
+      });
+      output += '\n';
+    }
+  }
+
+  // CSS Analysis
+  const unusedCss = metrics['unused-css-rules']?.details?.items || [];
+  const unminifiedCss = metrics['unminified-css']?.details?.items || [];
+  if (unusedCss.length > 0 || unminifiedCss.length > 0) {
+    output += '## CSS Issues\n';
+    if (unusedCss.length > 0) {
+      output += '### Unused CSS Rules\n';
+      unusedCss.forEach((item: AuditItem) => {
+        output += `* ${item.url}: ${item.wastedBytes} bytes unused\n`;
+      });
+      output += '\n';
+    }
+    if (unminifiedCss.length > 0) {
+      output += '### Unminified CSS\n';
+      unminifiedCss.forEach((item: AuditItem) => {
+        output += `* ${item.url}: Could save ${item.wastedBytes} bytes\n`;
+      });
+      output += '\n';
+    }
+  }
+
+  // Network Analysis
+  const networkRequests = metrics['network-requests']?.details?.items || [];
+  if (networkRequests.length > 0) {
+    output += '## Network Analysis\n';
+    const totalBytes = networkRequests.reduce((acc: number, item: AuditItem) => acc + (item.transferSize || 0), 0);
+    output += `Total Transfer Size: ${(totalBytes / 1024).toFixed(2)}KB\n\n`;
+
+    // Group by resource type
+    const byType = networkRequests.reduce((acc: Record<string, number>, item: AuditItem) => {
+      if (item.resourceType) {
+        acc[item.resourceType] = (acc[item.resourceType] || 0) + (item.transferSize || 0);
+      }
+      return acc;
+    }, {});
+
+    output += '### Resource Breakdown\n';
+    Object.entries(byType).forEach(([type, size]) => {
+      output += `* ${type}: ${(size / 1024).toFixed(2)}KB\n`;
+    });
+    output += '\n';
+  }
+
+  return output;
+}
+
+// Create a separate function for console output with colors
+function formatConsoleOutput(report: Result): string {
+  const metrics = report.audits as Record<string, LighthouseAudit>;
+  const score = (report.categories.performance?.score || 0) * 100;
+
   let output = `Performance Score: ${score.toFixed(0)}%\n\n`;
 
   // Core Web Vitals
@@ -351,7 +445,13 @@ Be specific about the impact of each issue and the potential benefits of fixing 
   return analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n');
 }
 
-export async function runLighthouse(): Promise<{ metrics: string, report: string, analysis: string, fullReport: Result }> {
+export async function runLighthouse(): Promise<{
+  metrics: string;
+  report: string;
+  analysis: string;
+  consoleOutput: string;
+  fullReport: Result;
+}> {
   // Check for running dev server
   const port = await findDevServer();
   if (!port) {
@@ -393,6 +493,7 @@ export async function runLighthouse(): Promise<{ metrics: string, report: string
     await chrome.kill();
 
     const formattedReport = formatLighthouseReport(report);
+    const consoleOutput = formatConsoleOutput(report);
     const analysis = await analyzeLighthouseReport(report);
 
     const score = (report.categories.performance?.score || 0) * 100;
@@ -403,11 +504,11 @@ export async function runLighthouse(): Promise<{ metrics: string, report: string
            `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n` +
            `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
 
-    // Get AI analysis of the full report
     return {
       metrics: metricsString,
       report: formattedReport,
-      analysis,
+      analysis: analysis,
+      consoleOutput: consoleOutput,
       fullReport: report
     };
   } catch (error) {

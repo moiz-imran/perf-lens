@@ -17,6 +17,7 @@ AI-powered frontend performance optimizer that analyzes your React, Vue, or othe
   - Runtime Performance Metrics
   - Code-Level Optimization Suggestions
   - Actionable Recommendations
+  - Export to Markdown or HTML
 - ⚡️ Smart Batch Processing
   - Configurable Analysis Limits
   - Automatic Token Management
@@ -53,6 +54,16 @@ Basic scan with default settings:
 perf-lens scan
 ```
 
+Save report as Markdown:
+```bash
+perf-lens scan --output report.md
+```
+
+Save report as HTML with custom settings:
+```bash
+perf-lens scan --output report.html --format html --max-files 50 --batch-size 10
+```
+
 Advanced usage with custom limits:
 ```bash
 perf-lens scan --max-files 50 --batch-size 10 --max-tokens 60000
@@ -67,6 +78,8 @@ perf-lens scan --max-files 50 --batch-size 10 --max-tokens 60000
 | `--max-size` | Maximum file size in KB | 100 |
 | `--batch-delay` | Delay between batches in ms | 1000 |
 | `--max-tokens` | Maximum tokens per batch | 100000 |
+| `--output` | Output file path for the report | - |
+| `--format` | Output format (`md` or `html`) | md |
 
 ## How It Works
 
