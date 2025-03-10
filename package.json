@@ -36,7 +36,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/moizimran/perf-lens.git"
+    "url": "git+https://github.com/moiz-imran/perf-lens.git"
   },
   "engines": {
     "node": ">=18"
