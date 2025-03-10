@@ -1,0 +1,23 @@
+{
+  "name": "with-react",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "vite",
+    "build": "tsc && vite build",
+    "analyze:perf": "perf-lens scan --config ./perflens.config.json",
+    "analyze:perf:prod": "NODE_ENV=production perf-lens scan --config ./perflens.config.json"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "perf-lens": "file:../../",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.1"
+  }
+}

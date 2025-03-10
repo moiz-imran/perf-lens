@@ -13,6 +13,10 @@ import { saveReport } from "./utils/output.js";
 import { loadConfig } from "./utils/config.js";
 import path from "path";
 
+// Export only what's necessary for external use
+export type { PerflensConfig } from './types/index.js';
+export { loadConfig } from './utils/config.js';
+
 const program = new Command();
 program.name('perf-lens')
        .description('Performance analysis tool combining Lighthouse audits with static code analysis')

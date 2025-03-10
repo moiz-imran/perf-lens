@@ -3,6 +3,7 @@
   "version": "1.2.0",
   "description": "AI-powered frontend performance optimizer",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
     "perf-lens": "dist/index.js"
@@ -13,7 +14,8 @@
     "prepublishOnly": "npm run build"
   },
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
     "README.md",
     "LICENSE"
   ],

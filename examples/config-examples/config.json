@@ -1,0 +1,28 @@
+{
+  "analysis": {
+    "maxFiles": 500,
+    "batchSize": 50,
+    "maxFileSize": 102400,
+    "batchDelay": 1000,
+    "targetDir": "./app"
+  },
+  "lighthouse": {
+    "port": 3000,
+    "mobileEmulation": false,
+    "throttling": {
+      "cpu": 4,
+      "network": "4G"
+    }
+  },
+  "output": {
+    "format": "md",
+    "directory": "./reports",
+    "filename": "performance-analysis",
+    "includeTimestamp": true
+  },
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "build/**"
+  ]
+}

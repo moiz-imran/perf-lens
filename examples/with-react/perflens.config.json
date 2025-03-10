@@ -1,0 +1,40 @@
+{
+  "analysis": {
+    "maxFiles": 1000,
+    "batchSize": 50,
+    "maxFileSize": 102400,
+    "batchDelay": 1000,
+    "targetDir": "./src"
+  },
+  "lighthouse": {
+    "port": 5173,
+    "mobileEmulation": true,
+    "throttling": {
+      "cpu": 4,
+      "network": "4G"
+    }
+  },
+  "output": {
+    "format": "md",
+    "directory": "./reports",
+    "filename": "react-app-performance",
+    "includeTimestamp": true
+  },
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "bundleThresholds": {
+    "maxInitialSize": 500000,
+    "maxChunkSize": 244000
+  },
+  "thresholds": {
+    "firstContentfulPaint": 1800,
+    "largestContentfulPaint": 2500,
+    "cumulativeLayoutShift": 0.1,
+    "totalBlockingTime": 300
+  }
+}
