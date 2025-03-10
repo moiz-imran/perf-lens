@@ -55,34 +55,39 @@ function calculateFilePriority(filePath: string, size: number): number {
 }
 
 /**
+ * Check if a file should be ignored based on patterns
+ */
+function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
+  const relativePath = path.relative(process.cwd(), filePath);
+  return ignorePatterns.some(pattern => {
+    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\//g, '\\/'));
+    return regex.test(relativePath);
+  });
+}
+
+/**
  * Recursively find all files in a directory that match the given extensions
  */
-function findFiles(dir: string, extensions: string[], config: AnalysisConfig): string[] {
+function findFiles(dir: string, extensions: string[], config: AnalysisConfig & { ignore?: string[] }): string[] {
   if (!fs.existsSync(dir)) {
     return [];
   }
 
   let results: string[] = [];
   const list = fs.readdirSync(dir);
+  const ignorePatterns = config.ignore || [];
 
   for (const file of list) {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
 
     // Skip ignored directories and files
+    if (shouldIgnoreFile(filePath, ignorePatterns)) {
+      continue;
+    }
+
     if (stat.isDirectory()) {
-      if (
-        file !== 'node_modules' &&
-        file !== '.git' &&
-        file !== 'dist' &&
-        file !== 'build' &&
-        file !== 'out' &&
-        file !== '.next' &&
-        file !== '.nuxt' &&
-        !file.startsWith('.')
-      ) {
-        results = results.concat(findFiles(filePath, extensions, config));
-      }
+      results = results.concat(findFiles(filePath, extensions, config));
     } else if (
       extensions.includes(path.extname(file)) &&
       stat.size <= (config.maxFileSize || MAX_FILE_SIZE)
@@ -488,7 +493,8 @@ export async function analyzeCodebase(config: AnalysisConfig & {
   lighthouseContext?: {
     metrics: string;
     analysis: string;
-  }
+  };
+  ignore?: string[];
 }): Promise<CodeAnalysisResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
