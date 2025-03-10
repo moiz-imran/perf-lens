@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { OpenAI } from 'openai';
 import { getApiKey } from './ai.js';
+import type { AnalysisConfig } from '../types/config.js';
 
 // File extensions to analyze
 const EXTENSIONS_TO_ANALYZE = [
@@ -16,8 +17,6 @@ const EXTENSIONS_TO_ANALYZE = [
 // Maximum file size to analyze (in bytes)
 const MAX_FILE_SIZE = 100 * 1024; // 100KB
 
-// Maximum number of files to analyze
-const MAX_FILES = 50;
 
 interface CodeAnalysisResult {
   critical: string[];
@@ -28,34 +27,6 @@ interface CodeAnalysisResult {
     warnings: string[];
     suggestions: string[];
   }>;
-}
-
-// Configuration for analysis limits
-interface AnalysisConfig {
-  maxFilesPerBatch: number;
-  maxTotalFiles: number;
-  maxFileSize: number;      // in bytes
-  batchDelayMs: number;     // delay between batches to avoid rate limits
-  maxTokensPerBatch: number;// maximum tokens per API call
-  lighthouseContext?: {     // optional lighthouse context
-    metrics: string;
-    analysis: string;
-  };
-}
-
-const DEFAULT_CONFIG: AnalysisConfig = {
-  maxFilesPerBatch: 20,     // Process 20 files at a time
-  maxTotalFiles: 200,       // Can analyze up to 200 files total
-  maxFileSize: 100 * 1024,  // 100KB
-  batchDelayMs: 1000,       // 1 second delay between batches
-  maxTokensPerBatch: 100000 // ~100KB of text
-};
-
-// Priority scoring for files
-interface FilePriority {
-  path: string;
-  size: number;
-  score: number;
 }
 
 /**
@@ -86,7 +57,7 @@ function calculateFilePriority(filePath: string, size: number): number {
 /**
  * Recursively find all files in a directory that match the given extensions
  */
-function findFiles(dir: string, extensions: string[]): string[] {
+function findFiles(dir: string, extensions: string[], config: AnalysisConfig): string[] {
   if (!fs.existsSync(dir)) {
     return [];
   }
@@ -98,7 +69,7 @@ function findFiles(dir: string, extensions: string[]): string[] {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
 
-    // Skip node_modules, .git, and other common directories to ignore
+    // Skip ignored directories and files
     if (stat.isDirectory()) {
       if (
         file !== 'node_modules' &&
@@ -110,11 +81,11 @@ function findFiles(dir: string, extensions: string[]): string[] {
         file !== '.nuxt' &&
         !file.startsWith('.')
       ) {
-        results = results.concat(findFiles(filePath, extensions));
+        results = results.concat(findFiles(filePath, extensions, config));
       }
     } else if (
       extensions.includes(path.extname(file)) &&
-      stat.size <= MAX_FILE_SIZE
+      stat.size <= (config.maxFileSize || MAX_FILE_SIZE)
     ) {
       results.push(filePath);
     }
@@ -176,13 +147,14 @@ function groupFilesByType(files: string[]): Record<string, string[]> {
 }
 
 /**
- * Analyze a group of files with the LLM
+ * Analyze a group of files
  */
 async function analyzeFileGroup(
   groupName: string,
   files: string[],
   openai: OpenAI,
-  config: AnalysisConfig
+  config: AnalysisConfig,
+  lighthouseContext?: { metrics: string; analysis: string }
 ): Promise<{ critical: string[], warnings: string[], suggestions: string[], fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> }> {
   if (files.length === 0) {
     return { critical: [], warnings: [], suggestions: [], fileIssues: {} };
@@ -206,15 +178,15 @@ async function analyzeFileGroup(
     const size = content.length;
 
     // Check if adding this file would exceed our limits
-    if (totalSize + size <= config.maxTokensPerBatch && // Token limit
-        filesToAnalyze.length < config.maxFilesPerBatch && // File count limit
-        size <= config.maxFileSize) { // Individual file size limit
+    if (totalSize + size <= (config.maxTokensPerBatch || 100000) && // Token limit
+        filesToAnalyze.length < (config.batchSize || 20) && // File count limit
+        size <= (config.maxFileSize || MAX_FILE_SIZE)) { // Individual file size limit
       fileContents[file] = content;
       filesToAnalyze.push(file);
       totalSize += size;
-    } else if (size > config.maxFileSize) {
+    } else if (size > (config.maxFileSize || MAX_FILE_SIZE)) {
       spinner.stop();
-      console.log(chalk.yellow(`\nSkipping ${path.relative(process.cwd(), file)} (${Math.round(size / 1024)}KB) - exceeds size limit of ${Math.round(config.maxFileSize / 1024)}KB`));
+      console.log(chalk.yellow(`\nSkipping ${path.relative(process.cwd(), file)} (${Math.round(size / 1024)}KB) - exceeds size limit of ${Math.round((config.maxFileSize || 100 * 1024) / 1024)}KB`));
       spinner.start();
     }
   }
@@ -223,7 +195,7 @@ async function analyzeFileGroup(
 
   // Print out the specific files being sent to the AI
   spinner.stop();
-  console.log(chalk.blue.bold(`\nSending to AI for ${groupName} analysis:`));
+  console.log(chalk.blue.bold(`\nAnalyzing ${groupName} files:`));
   filesToAnalyze.forEach((file, index) => {
     const relativePath = path.relative(process.cwd(), file);
     const fileSize = Math.round(fileContents[file].length / 1024);
@@ -231,17 +203,17 @@ async function analyzeFileGroup(
   });
   spinner.start();
 
-  // Create a detailed prompt for the LLM
+  // Create analysis prompt
   const prompt = `You are a performance optimization expert specializing in frontend web development.
 I need you to analyze the following ${groupName} files for performance issues and optimization opportunities.
 
-${config.lighthouseContext ? `
+${lighthouseContext ? `
 LIGHTHOUSE CONTEXT:
 Performance Metrics:
-${config.lighthouseContext.metrics}
+${lighthouseContext.metrics}
 
 Analysis:
-${config.lighthouseContext.analysis}
+${lighthouseContext.analysis}
 
 Use the above Lighthouse insights to guide your code analysis. Look for specific code patterns that might be causing the performance issues identified by Lighthouse.
 ` : ''}
@@ -379,7 +351,7 @@ Focus on these performance aspects:
     const warnings = parseIssues(analysisText, '⚠️');
     const suggestions = parseIssues(analysisText, '💡');
 
-    // Track issues by file with improved parsing
+    // Track issues by file
     const fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> = {};
 
     // Initialize fileIssues for each file
@@ -431,7 +403,8 @@ Focus on these performance aspects:
 async function processBatchedFiles(
   files: string[],
   config: AnalysisConfig,
-  openai: OpenAI
+  openai: OpenAI,
+  lighthouseContext?: { metrics: string; analysis: string }
 ): Promise<CodeAnalysisResult> {
   const result: CodeAnalysisResult = {
     critical: [],
@@ -441,7 +414,7 @@ async function processBatchedFiles(
   };
 
   // Calculate priority for each file
-  const filePriorities: FilePriority[] = files.map(file => ({
+  const filePriorities = files.map(file => ({
     path: file,
     size: fs.statSync(file).size,
     score: calculateFilePriority(file, fs.statSync(file).size)
@@ -452,7 +425,7 @@ async function processBatchedFiles(
 
   // Take only the maximum allowed files
   const filesToProcess = filePriorities
-    .slice(0, config.maxTotalFiles)
+    .slice(0, config.maxFiles || 200)
     .map(fp => fp.path);
 
   // Group files by type
@@ -463,8 +436,8 @@ async function processBatchedFiles(
     if (groupFiles.length === 0) continue;
 
     const batches = [];
-    for (let i = 0; i < groupFiles.length; i += config.maxFilesPerBatch) {
-      batches.push(groupFiles.slice(i, i + config.maxFilesPerBatch));
+    for (let i = 0; i < groupFiles.length; i += (config.batchSize || 20)) {
+      batches.push(groupFiles.slice(i, i + (config.batchSize || 20)));
     }
 
     const spinner = ora(`Processing ${groupName} files in ${batches.length} batches...`).start();
@@ -483,7 +456,7 @@ async function processBatchedFiles(
       });
       spinner.start();
 
-      const batchResults = await analyzeFileGroup(groupName, batches[i], openai, config);
+      const batchResults = await analyzeFileGroup(groupName, batches[i], openai, config, lighthouseContext);
 
       // Merge results
       result.critical.push(...batchResults.critical);
@@ -495,10 +468,10 @@ async function processBatchedFiles(
         result.fileSpecificIssues[filePath] = issues;
       }
 
-      // Add delay between batches to avoid rate limits
+      // Add delay between batches
       if (i < batches.length - 1) {
-        spinner.text = `Waiting ${config.batchDelayMs}ms before next batch...`;
-        await new Promise(resolve => setTimeout(resolve, config.batchDelayMs));
+        spinner.text = `Waiting ${config.batchDelay || 1000}ms before next batch...`;
+        await new Promise(resolve => setTimeout(resolve, config.batchDelay || 1000));
       }
     }
 
@@ -511,9 +484,12 @@ async function processBatchedFiles(
 /**
  * Analyze the entire codebase for performance issues
  */
-export async function analyzeCodebase(customConfig?: Partial<AnalysisConfig>): Promise<CodeAnalysisResult> {
-  const config = { ...DEFAULT_CONFIG, ...customConfig };
-
+export async function analyzeCodebase(config: AnalysisConfig & {
+  lighthouseContext?: {
+    metrics: string;
+    analysis: string;
+  }
+}): Promise<CodeAnalysisResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error(
@@ -526,10 +502,21 @@ export async function analyzeCodebase(customConfig?: Partial<AnalysisConfig>): P
   const openai = new OpenAI({ apiKey });
   const spinner = ora('Finding files to analyze...').start();
 
-  // Find all files to analyze
-  const allFiles = findFiles(process.cwd(), EXTENSIONS_TO_ANALYZE);
+  // Determine the directory to scan
+  const baseDir = config.targetDir
+    ? path.resolve(process.cwd(), config.targetDir)
+    : process.cwd();
 
-  spinner.succeed(`Found ${allFiles.length} files to analyze`);
+  // Verify the directory exists
+  if (!fs.existsSync(baseDir)) {
+    spinner.fail(`Target directory does not exist: ${baseDir}`);
+    throw new Error(`Target directory does not exist: ${baseDir}`);
+  }
+
+  // Find all files to analyze
+  const allFiles = findFiles(baseDir, EXTENSIONS_TO_ANALYZE, config);
+
+  spinner.succeed(`Found ${allFiles.length} files to analyze in ${path.relative(process.cwd(), baseDir) || '.'}`);
 
   // Print summary of files found
   console.log(chalk.blue.bold('\nFiles found by type:'));
@@ -543,10 +530,10 @@ export async function analyzeCodebase(customConfig?: Partial<AnalysisConfig>): P
     console.log(`${chalk.yellow(ext)}: ${count} files`);
   });
 
-  if (allFiles.length > config.maxTotalFiles) {
-    console.log(chalk.yellow(`\nNote: Found ${allFiles.length} files, but will only analyze the ${config.maxTotalFiles} highest priority files.`));
+  if (allFiles.length > (config.maxFiles || 200)) {
+    console.log(chalk.yellow(`\nNote: Found ${allFiles.length} files, but will only analyze the ${config.maxFiles || 200} highest priority files.`));
   }
 
   // Process files in batches with prioritization
-  return processBatchedFiles(allFiles, config, openai);
+  return processBatchedFiles(allFiles, config, openai, config.lighthouseContext);
 }

@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# Test files
+**/*.test.*
+**/*.spec.*
+**/test/
+**/tests/
+**/coverage/
+
+# Configuration files
+**/*.config.js
+**/*.config.ts
+**/*.config.json
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+
+# Generated files
+**/*.min.js
+**/*.bundle.js
+**/*.chunk.js
+**/*.generated.*
+
+# Assets (optional - uncomment if you want to ignore)
+# **/assets/
+# **/public/
+# **/*.svg
+# **/*.png
+# **/*.jpg
+# **/*.jpeg
+# **/*.gif
+# **/*.ico
+
+# Documentation
+docs/
+**/*.md
+**/LICENSE
+**/README*
+
+# Environment files
+.env*
+.env.local
+.env.development
+.env.test
+.env.production

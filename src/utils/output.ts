@@ -645,6 +645,12 @@ export function saveReport(data: PerformanceReport, format: 'md' | 'html' = 'md'
   const defaultFileName = `performance-report-${timestamp}`;
   const filePath = outputPath || path.join(process.cwd(), defaultFileName + '.' + format);
 
+  // Create output directory if it doesn't exist
+  const outputDir = path.dirname(filePath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
   const content = format === 'md'
     ? generateMarkdownReport(data)
     : generateHtmlReport(data);

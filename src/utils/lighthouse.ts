@@ -1,6 +1,5 @@
-import lighthouse, { type Result } from "lighthouse";
+import lighthouse, { type Result, Flags } from "lighthouse";
 import * as chromeLauncher from 'chrome-launcher';
-import { Flags } from 'lighthouse';
 import axios from 'axios';
 import chalk from 'chalk';
 import fs from 'fs';
@@ -8,6 +7,7 @@ import inquirer from 'inquirer';
 import ora from 'ora';
 import { OpenAI } from 'openai';
 import { getApiKey } from './ai.js';
+import type { LighthouseConfig, BundleThresholds, PerformanceThresholds } from '../types/config.js';
 
 // Add type definitions for Lighthouse audit details
 interface AuditItem {
@@ -34,7 +34,7 @@ interface LighthouseAudit {
   [key: string]: any;
 }
 
-const COMMON_DEV_PORTS = [3000, 3001, 5173, 8080, 4321, 4000];
+const COMMON_DEV_PORTS = [3000, 5173, 8080, 4321, 4000];
 
 async function findPortInPackageJson(): Promise<number | null> {
   try {
@@ -142,20 +142,164 @@ async function findDevServer(): Promise<number | null> {
 /**
  * Format Lighthouse metrics into a readable report
  */
-function formatLighthouseReport(report: Result): string {
+function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds): string {
   const metrics = report.audits as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
 
-  let output = `# Performance Score: ${score.toFixed(0)}%\n\n`;
+  let output = `# Performance Score: ${score.toFixed(0)}%\n`;
+  if (performanceThresholds?.performance && score < performanceThresholds.performance) {
+    output += `⚠️ Performance score is below threshold of ${performanceThresholds.performance}%\n`;
+  }
+  output += '\n';
 
-  // Core Web Vitals
+  // Core Web Vitals with thresholds
   output += '## Core Web Vitals\n';
-  output += `* First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n`;
-  output += `* Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}\n`;
-  output += `* Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}\n`;
-  output += `* Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}\n`;
-  output += `* Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}\n`;
-  output += `* Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n\n`;
+
+  // First Contentful Paint
+  const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
+  output += `* First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.firstContentfulPaint && fcp > performanceThresholds.firstContentfulPaint) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.firstContentfulPaint}ms)`;
+  }
+  output += '\n';
+
+  // Largest Contentful Paint
+  const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
+  output += `* Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.largestContentfulPaint && lcp > performanceThresholds.largestContentfulPaint) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.largestContentfulPaint}ms)`;
+  }
+  output += '\n';
+
+  // Total Blocking Time
+  const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
+  output += `* Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.totalBlockingTime && tbt > performanceThresholds.totalBlockingTime) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.totalBlockingTime}ms)`;
+  }
+  output += '\n';
+
+  // Cumulative Layout Shift
+  const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
+  output += `* Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.cumulativeLayoutShift && cls > performanceThresholds.cumulativeLayoutShift) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.cumulativeLayoutShift})`;
+  }
+  output += '\n';
+
+  // Speed Index
+  const si = parseFloat(metrics['speed-index']?.numericValue) || 0;
+  output += `* Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.speedIndex && si > performanceThresholds.speedIndex) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.speedIndex}ms)`;
+  }
+  output += '\n';
+
+  // Time to Interactive
+  const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
+  output += `* Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.timeToInteractive && tti > performanceThresholds.timeToInteractive) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.timeToInteractive}ms)`;
+  }
+  output += '\n\n';
+
+  // Bundle Size Analysis
+  const requests = metrics['network-requests']?.details?.items || [];
+  if (requests.length > 0) {
+    output += '## Bundle Size Analysis\n';
+
+    // Calculate total bundle size
+    const totalJsSize = requests
+      .filter(item => item.resourceType === 'Script')
+      .reduce((acc, item) => acc + (item.transferSize || 0), 0);
+
+    // Calculate chunk sizes
+    const jsChunks = requests
+      .filter(item => item.resourceType === 'Script')
+      .map(item => ({
+        url: item.url || '',
+        size: item.transferSize || 0
+      }));
+
+    // Calculate asset sizes by type
+    const assetSizes = requests.reduce((acc, item) => {
+      if (item.resourceType === 'Image' && item.url) {
+        acc.images.push({ url: item.url, size: item.transferSize || 0 });
+      } else if (item.resourceType === 'Font' && item.url) {
+        acc.fonts.push({ url: item.url, size: item.transferSize || 0 });
+      }
+      return acc;
+    }, { images: [], fonts: [] } as { images: Array<{url: string, size: number}>, fonts: Array<{url: string, size: number}> });
+
+    // Check against thresholds
+    if (bundleThresholds) {
+      const totalBundleKb = totalJsSize / 1024;
+      const maxBundleKb = parseInt(bundleThresholds.maxBundleSize || '0');
+      if (maxBundleKb > 0 && totalBundleKb > maxBundleKb) {
+        output += `⚠️ Total bundle size (${totalBundleKb.toFixed(1)}KB) exceeds threshold (${maxBundleKb}KB)\n`;
+      }
+
+      // Check chunk sizes
+      const maxChunkKb = parseInt(bundleThresholds.maxChunkSize || '0');
+      if (maxChunkKb > 0) {
+        const largeChunks = jsChunks.filter(chunk => chunk.size / 1024 > maxChunkKb);
+        if (largeChunks.length > 0) {
+          output += '\n### Large JavaScript Chunks:\n';
+          largeChunks.forEach(chunk => {
+            output += `* ${chunk.url}: ${(chunk.size / 1024).toFixed(1)}KB (exceeds ${maxChunkKb}KB limit)\n`;
+          });
+        }
+      }
+
+      // Check general asset size (applies to all resource types)
+      const maxAssetKb = parseInt(bundleThresholds.maxAssetSize || '0');
+      if (maxAssetKb > 0) {
+        const largeAssets = requests
+          .filter(item => item.transferSize && item.transferSize / 1024 > maxAssetKb)
+          .map(item => ({
+            url: item.url || '',
+            size: item.transferSize || 0,
+            type: item.resourceType || 'unknown'
+          }));
+
+        if (largeAssets.length > 0) {
+          output += '\n### Large Assets:\n';
+          largeAssets.forEach(asset => {
+            output += `* [${asset.type}] ${asset.url}: ${(asset.size / 1024).toFixed(1)}KB (exceeds ${maxAssetKb}KB limit)\n`;
+          });
+        }
+      }
+
+      // Check image sizes
+      const maxImageKb = parseInt(bundleThresholds.maxImageSize || '0');
+      if (maxImageKb > 0) {
+        const largeImages = assetSizes.images.filter(img => img.size / 1024 > maxImageKb);
+        if (largeImages.length > 0) {
+          output += '\n### Large Images:\n';
+          largeImages.forEach(img => {
+            output += `* ${img.url}: ${(img.size / 1024).toFixed(1)}KB (exceeds ${maxImageKb}KB limit)\n`;
+          });
+        }
+      }
+
+      // Check font sizes
+      const maxFontKb = parseInt(bundleThresholds.maxFontSize || '0');
+      if (maxFontKb > 0) {
+        const largeFonts = assetSizes.fonts.filter(font => font.size / 1024 > maxFontKb);
+        if (largeFonts.length > 0) {
+          output += '\n### Large Fonts:\n';
+          largeFonts.forEach(font => {
+            output += `* ${font.url}: ${(font.size / 1024).toFixed(1)}KB (exceeds ${maxFontKb}KB limit)\n`;
+          });
+        }
+      }
+    }
+
+    output += '\n### Resource Size Summary:\n';
+    output += `* Total JavaScript: ${(totalJsSize / 1024).toFixed(1)}KB\n`;
+    output += `* Total Images: ${(assetSizes.images.reduce((acc, img) => acc + img.size, 0) / 1024).toFixed(1)}KB\n`;
+    output += `* Total Fonts: ${(assetSizes.fonts.reduce((acc, font) => acc + font.size, 0) / 1024).toFixed(1)}KB\n\n`;
+  }
 
   // Performance Opportunities
   const renderBlockingResources = metrics['render-blocking-resources']?.details?.items || [];
@@ -236,20 +380,66 @@ function formatLighthouseReport(report: Result): string {
 }
 
 // Create a separate function for console output with colors
-function formatConsoleOutput(report: Result): string {
+function formatConsoleOutput(report: Result, performanceThresholds?: PerformanceThresholds): string {
   const metrics = report.audits as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
 
-  let output = `Performance Score: ${score.toFixed(0)}%\n\n`;
+  let output = `Performance Score: ${score.toFixed(0)}%`;
+  if (performanceThresholds?.performance && score < performanceThresholds.performance) {
+    output += chalk.yellow(` ⚠️  Below threshold of ${performanceThresholds.performance}%`);
+  }
+  output += '\n\n';
 
   // Core Web Vitals
   output += chalk.blue.bold('Core Web Vitals:\n');
-  output += `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n`;
-  output += `Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}\n`;
-  output += `Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}\n`;
-  output += `Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}\n`;
-  output += `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}\n`;
-  output += `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n\n`;
+
+  // First Contentful Paint
+  const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
+  output += `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.firstContentfulPaint && fcp > performanceThresholds.firstContentfulPaint) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.firstContentfulPaint}ms`);
+  }
+  output += '\n';
+
+  // Largest Contentful Paint
+  const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
+  output += `Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.largestContentfulPaint && lcp > performanceThresholds.largestContentfulPaint) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.largestContentfulPaint}ms`);
+  }
+  output += '\n';
+
+  // Total Blocking Time
+  const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
+  output += `Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.totalBlockingTime && tbt > performanceThresholds.totalBlockingTime) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.totalBlockingTime}ms`);
+  }
+  output += '\n';
+
+  // Cumulative Layout Shift
+  const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
+  output += `Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.cumulativeLayoutShift && cls > performanceThresholds.cumulativeLayoutShift) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.cumulativeLayoutShift}`);
+  }
+  output += '\n';
+
+  // Speed Index
+  const si = parseFloat(metrics['speed-index']?.numericValue) || 0;
+  output += `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.speedIndex && si > performanceThresholds.speedIndex) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.speedIndex}ms`);
+  }
+  output += '\n';
+
+  // Time to Interactive
+  const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
+  output += `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.timeToInteractive && tti > performanceThresholds.timeToInteractive) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.timeToInteractive}ms`);
+  }
+  output += '\n\n';
 
   // Performance Opportunities
   const renderBlockingResources = metrics['render-blocking-resources']?.details?.items || [];
@@ -445,7 +635,7 @@ Be specific about the impact of each issue and the potential benefits of fixing 
   return analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n');
 }
 
-export async function runLighthouse(): Promise<{
+export async function runLighthouse(config?: LighthouseConfig & { bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds }): Promise<{
   metrics: string;
   report: string;
   analysis: string;
@@ -453,7 +643,7 @@ export async function runLighthouse(): Promise<{
   fullReport: Result;
 }> {
   // Check for running dev server
-  const port = await findDevServer();
+  const port = config?.port || await findDevServer();
   if (!port) {
     throw new Error(
       chalk.red('\nNo development server detected!') +
@@ -472,13 +662,48 @@ export async function runLighthouse(): Promise<{
     output: 'json' as const,
     onlyCategories: ['performance'],
     port: chrome.port,
-    formFactor: 'mobile' as const,
-    screenEmulation: {
+    formFactor: config?.mobileEmulation ? 'mobile' : 'desktop' as const,
+    screenEmulation: config?.mobileEmulation ? {
       mobile: true,
       width: 375,
       height: 667,
       deviceScaleFactor: 2,
       disabled: false,
+    } : {
+      mobile: false,
+      width: 1350,
+      height: 940,
+      deviceScaleFactor: 1,
+      disabled: false,
+    },
+    throttling: {
+      cpuSlowdownMultiplier: config?.throttling?.cpu || 4,
+      // Network throttling presets
+      ...(config?.throttling?.network === 'slow3G' ? {
+        rttMs: 150,
+        throughputKbps: 1638.4,
+        requestLatencyMs: 562.5,
+        downloadThroughputKbps: 1474.5600000000002,
+        uploadThroughputKbps: 675,
+      } : config?.throttling?.network === 'fast3G' ? {
+        rttMs: 40,
+        throughputKbps: 10240,
+        requestLatencyMs: 150,
+        downloadThroughputKbps: 9216,
+        uploadThroughputKbps: 3075,
+      } : config?.throttling?.network === '4G' ? {
+        rttMs: 20,
+        throughputKbps: 20480,
+        requestLatencyMs: 75,
+        downloadThroughputKbps: 18432,
+        uploadThroughputKbps: 6144,
+      } : {
+        rttMs: 0,
+        throughputKbps: 0,
+        requestLatencyMs: 0,
+        downloadThroughputKbps: 0,
+        uploadThroughputKbps: 0,
+      })
     }
   };
 
@@ -492,8 +717,8 @@ export async function runLighthouse(): Promise<{
     const report = runnerResult.lhr;
     await chrome.kill();
 
-    const formattedReport = formatLighthouseReport(report);
-    const consoleOutput = formatConsoleOutput(report);
+    const formattedReport = formatLighthouseReport(report, config?.bundleThresholds, config?.performanceThresholds);
+    const consoleOutput = formatConsoleOutput(report, config?.performanceThresholds);
     const analysis = await analyzeLighthouseReport(report);
 
     const score = (report.categories.performance?.score || 0) * 100;

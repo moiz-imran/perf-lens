@@ -10,9 +10,13 @@ import { runLighthouse } from "./utils/lighthouse.js";
 import { getApiKey, setApiKey } from "./utils/ai.js";
 import { analyzeCodebase } from "./utils/codeAnalysis.js";
 import { saveReport } from "./utils/output.js";
+import { loadConfig } from "./utils/config.js";
+import path from "path";
 
 const program = new Command();
-program.name('perf-lens').description('AI-powered frontend performance optimizer').version('1.1.0');
+program.name('perf-lens')
+       .description('Performance analysis tool combining Lighthouse audits with static code analysis')
+       .version('1.1.0');
 
 program
   .command('config')
@@ -42,44 +46,63 @@ program
 program
   .command("scan")
   .description("Scan your frontend UI for performance issues")
-  .option('--max-files <number>', 'Maximum total number of files to analyze', '200')
-  .option('--batch-size <number>', 'Number of files to analyze per batch', '20')
-  .option('--max-size <number>', 'Maximum file size in KB to analyze', '100')
-  .option('--batch-delay <number>', 'Delay between batches in milliseconds', '1000')
-  .option('--max-tokens <number>', 'Maximum tokens per batch (affects how much code can be analyzed at once)', '100000')
-  .option('--output <path>', 'Output file path for the report')
-  .option('--format <type>', 'Output format (md or html)', 'md')
+  .option('-c, --config <path>', 'Path to config file')
+  .option('-p, --port <number>', 'Development server port')
+  .option('-t, --target <directory>', 'Target directory to scan (default: current directory)')
+  .option('-f, --max-files <number>', 'Maximum total number of files to analyze')
+  .option('-b, --batch-size <number>', 'Number of files to analyze per batch')
+  .option('-s, --max-size <number>', 'Maximum file size in KB to analyze')
+  .option('-d, --batch-delay <number>', 'Delay between batches in milliseconds')
+  .option('-o, --output <path>', 'Output file path for the report')
+  .option('--format <type>', 'Output format (md or html)')
+  .option('--mobile', 'Enable mobile emulation')
+  .option('--cpu-throttle <number>', 'CPU throttle percentage')
+  .option('--network-throttle <type>', 'Network throttle type (slow3G, fast3G, 4G, none)')
   .action(async (options) => {
     try {
       console.clear();
       console.log(chalk.blue.bold('🔍 PerfLens Performance Scanner'));
       console.log(chalk.gray('─'.repeat(50)));
 
-      // Validate format option
-      if (options.format && !['md', 'html'].includes(options.format)) {
-        console.error(chalk.red('Error: Output format must be either "md" or "html"'));
-        return;
-      }
+      // Load configuration
+      const config = await loadConfig(options.config ? path.resolve(process.cwd(), options.config) : undefined);
 
-      // Parse configuration options
-      const config = {
-        maxTotalFiles: parseInt(options.maxFiles),
-        maxFilesPerBatch: parseInt(options.batchSize),
-        maxFileSize: parseInt(options.maxSize) * 1024, // Convert KB to bytes
-        batchDelayMs: parseInt(options.batchDelay),
-        maxTokensPerBatch: parseInt(options.maxTokens)
-      };
+      // Override config with CLI options
+      if (options.maxFiles) config.analysis!.maxFiles = parseInt(options.maxFiles);
+      if (options.batchSize) config.analysis!.batchSize = parseInt(options.batchSize);
+      if (options.maxSize) config.analysis!.maxFileSize = parseInt(options.maxSize) * 1024;
+      if (options.batchDelay) config.analysis!.batchDelay = parseInt(options.batchDelay);
+      if (options.format) config.output!.format = options.format as 'md' | 'html';
+      if (options.port) config.lighthouse!.port = parseInt(options.port);
+      if (options.target) config.analysis!.targetDir = options.target;
+      if (options.output) {
+        const outputPath = options.output;
+        config.output = {
+          ...config.output,
+          directory: path.dirname(outputPath),
+          filename: path.basename(outputPath, path.extname(outputPath))
+        };
+      }
+      if (options.mobile) config.lighthouse!.mobileEmulation = true;
+      if (options.cpuThrottle) config.lighthouse!.throttling!.cpu = parseInt(options.cpuThrottle);
+      if (options.networkThrottle) config.lighthouse!.throttling!.network = options.networkThrottle as 'slow3G' | 'fast3G' | '4G' | 'none';
 
       // Print analysis configuration
       console.log(chalk.blue.bold('\nAnalysis Configuration:'));
-      console.log(`Maximum files to analyze: ${chalk.yellow(config.maxTotalFiles)}`);
-      console.log(`Files per batch: ${chalk.yellow(config.maxFilesPerBatch)}`);
-      console.log(`Maximum file size: ${chalk.yellow(options.maxSize)}KB`);
-      console.log(`Batch delay: ${chalk.yellow(config.batchDelayMs)}ms`);
-      console.log(`Maximum tokens per batch: ${chalk.yellow(config.maxTokensPerBatch)}`);
-      if (options.output) {
-        console.log(`Output file: ${chalk.yellow(options.output)} (${options.format})`);
+      if (config.analysis?.targetDir) {
+        console.log(`Target directory: ${chalk.yellow(config.analysis.targetDir)}`);
       }
+      console.log(`Maximum files to analyze: ${chalk.yellow(config.analysis?.maxFiles)}`);
+      console.log(`Files per batch: ${chalk.yellow(config.analysis?.batchSize)}`);
+      console.log(`Maximum file size: ${chalk.yellow(Math.floor((config.analysis?.maxFileSize || 0) / 1024))}KB`);
+      console.log(`Batch delay: ${chalk.yellow(config.analysis?.batchDelay)}ms`);
+      if (config.lighthouse?.port) {
+        console.log(`Development server port: ${chalk.yellow(config.lighthouse.port)}`);
+      }
+      if (config.output?.directory) {
+        console.log(`Output directory: ${chalk.yellow(config.output.directory)}`);
+      }
+      console.log(`Output format: ${chalk.yellow(config.output?.format || 'md')}`);
       console.log(chalk.gray('─'.repeat(50)));
 
       // Step 1: Run Lighthouse Analysis
@@ -87,20 +110,23 @@ program
       let lhResults;
       try {
         mainSpinner.stop();
-        lhResults = await runLighthouse();
+        lhResults = await runLighthouse({
+          ...config.lighthouse,
+          bundleThresholds: config.bundleThresholds,
+          performanceThresholds: config.thresholds
+        });
 
-        console.log('\n' + chalk.blue.bold('🌟 Lighthouse Performance Report'));
-        console.log(chalk.gray('─'.repeat(50)));
+        // Print metrics to console
         console.log(lhResults.consoleOutput);
 
         // Step 2: Code analysis with Lighthouse context
-        console.log('\n' + chalk.blue.bold('🧠 AI-Powered Code Analysis'));
+        console.log('\n' + chalk.blue.bold('🧠 Code Analysis'));
         console.log(chalk.gray('─'.repeat(50)));
         console.log(chalk.gray('Analyzing your codebase with Lighthouse insights...'));
 
         try {
           const codeAnalysisResults = await analyzeCodebase({
-            ...config,
+            ...config.analysis,
             lighthouseContext: {
               metrics: lhResults.metrics,
               analysis: lhResults.analysis,
@@ -113,7 +139,7 @@ program
             codeAnalysisResults.suggestions.length;
 
           // Display results in console
-          console.log(`\nAI found ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`);
+          console.log(`\nFound ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`);
 
           if (codeAnalysisResults.critical.length > 0) {
             console.log(chalk.red.bold('\n🚨 Critical Code Issues:'));
@@ -130,24 +156,31 @@ program
             codeAnalysisResults.suggestions.forEach(issue => console.log(issue));
           }
 
-          // Save report if output option is provided
-          if (options.output || options.format !== 'md') {
-            const reportData = {
-              lighthouse: {
-                metrics: lhResults.metrics,
-                report: lhResults.report,
-                analysis: lhResults.analysis,
-              },
-              codeAnalysis: {
-                critical: codeAnalysisResults.critical,
-                warnings: codeAnalysisResults.warnings,
-                suggestions: codeAnalysisResults.suggestions,
-              }
-            };
+          // Save report
+          const reportData = {
+            lighthouse: {
+              metrics: lhResults.metrics,
+              report: lhResults.report,
+              analysis: lhResults.analysis,
+            },
+            codeAnalysis: {
+              critical: codeAnalysisResults.critical,
+              warnings: codeAnalysisResults.warnings,
+              suggestions: codeAnalysisResults.suggestions,
+            }
+          };
 
-            const savedPath = saveReport(reportData, options.format as 'md' | 'html', options.output);
-            console.log(chalk.green(`\nReport saved to: ${savedPath}`));
-          }
+          const savedPath = saveReport(
+            reportData,
+            config.output?.format || 'md',
+            config.output?.directory
+              ? path.join(
+                  config.output.directory,
+                  `${config.output.filename || 'performance-report'}${config.output.includeTimestamp ? `-${new Date().toISOString().replace(/[:.]/g, '-')}` : ''}.${config.output.format}`
+                )
+              : undefined
+          );
+          console.log(chalk.green(`\nReport saved to: ${savedPath}`));
 
           // Final summary
           console.log('\n' + chalk.blue.bold('✨ Analysis Complete'));
@@ -157,7 +190,7 @@ program
           console.log(chalk.blue('2. 🧠 Code Analysis - Specific code-level improvements based on Lighthouse insights'));
 
         } catch (error) {
-          console.error(chalk.red('Error during AI code analysis:'), error);
+          console.error(chalk.red('Error during code analysis:'), error);
         }
       } catch (lhError) {
         mainSpinner.fail('Lighthouse audit failed');

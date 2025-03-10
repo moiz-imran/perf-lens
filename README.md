@@ -81,12 +81,142 @@ perf-lens scan --max-files 50 --batch-size 10 --max-size 100
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| \`--max-files\` | Maximum files to analyze | 200 |
-| \`--batch-size\` | Files per batch | 20 |
-| \`--max-size\` | Maximum file size (KB) | 100 |
-| \`--batch-delay\` | Delay between batches (ms) | 1000 |
-| \`--output\` | Report output path | - |
-| \`--format\` | Output format (md/html) | md |
+| `-c, --config` | Path to config file | - |
+| `-p, --port` | Development server port | auto-detect |
+| `-t, --target` | Target directory to scan | current directory |
+| `-f, --max-files` | Maximum files to analyze | 200 |
+| `-b, --batch-size` | Files per batch | 20 |
+| `-s, --max-size` | Maximum file size (KB) | 100 |
+| `-d, --batch-delay` | Delay between batches (ms) | 1000 |
+| `-o, --output` | Report output path | - |
+| `--format` | Output format (md/html) | md |
+| `--mobile` | Enable mobile emulation | false |
+| `--cpu-throttle` | CPU slowdown multiplier | 4 |
+| `--network-throttle` | Network throttle type (slow3G/fast3G/4G/none) | fast3G |
+
+### Configuration File
+
+PerfLens supports configuration files in multiple formats. Create any of these files in your project root:
+- `.perflensrc.js` or `perflens.config.js` (JavaScript with ES modules)
+- `.perflensrc.json` (JSON format)
+- `.perflensrc.yaml` or `.perflensrc.yml` (YAML format)
+- `package.json` with a "perflens" field
+
+Example configuration (`perflens.config.js`):
+```javascript
+/** @type {import('perf-lens').PerflensConfig} */
+export default {
+  // Analysis configuration
+  analysis: {
+    batchDelay: 1000, // Delay between batches in milliseconds
+    batchSize: 20, // Number of files to analyze per batch
+    maxFileSize: 102400, // Maximum file size in bytes (100KB)
+    maxFiles: 200, // Maximum number of files to analyze
+    maxTokensPerBatch: 10000, //
+    targetDir: 'src' // Directory to scan, relative to cwd
+  },
+
+  // Bundle size thresholds
+  bundleThresholds: {
+    maxAssetSize: '100kb', // Maximum size for any asset
+    maxBundleSize: '250kb', // Maximum total bundle size
+    maxChunkSize: '50kb', // Maximum chunk size
+    maxFontSize: '50kb', // Maximum size for font files
+    maxImageSize: '100kb' // Maximum size for images
+  },
+
+  // Lighthouse configuration
+  lighthouse: {
+    port: 3001, // Development server port
+    mobileEmulation: true, // Enable mobile emulation
+    throttling: {
+      cpu: 4, // CPU slowdown multiplier
+      network: 'fast3G' // Network throttling preset
+    }
+  },
+
+  // Output configuration
+  output: {
+    directory: './reports', // Output directory
+    filename: 'performance-report', // Base filename (without extension)
+    format: 'html', // 'md' or 'html'
+    includeTimestamp: true // Add timestamp to filename
+  },
+
+  // Performance score thresholds
+  thresholds: {
+    performance: 90, // Minimum overall Lighthouse performance score
+    firstContentfulPaint: 2000, // Maximum FCP in milliseconds
+    largestContentfulPaint: 2500, // Maximum LCP in milliseconds
+    totalBlockingTime: 200, // Maximum TBT in milliseconds
+    cumulativeLayoutShift: 0.1, // Maximum CLS score
+    speedIndex: 3000, // Maximum Speed Index in milliseconds
+    timeToInteractive: 3800 // Maximum TTI in milliseconds
+  },
+
+  // Custom rules configuration
+  rules: {
+    'minify-javascript': {
+      severity: 'error'
+    },
+    'no-render-blocking-resources': {
+      severity: 'error',
+      threshold: 500 // Maximum blocking time in ms
+    },
+    'optimize-images': {
+      severity: 'warning',
+      options: {
+        lazy: true, // Use lazy loading
+        webp: true // Convert images to WebP
+      }
+    }
+  }
+};
+```
+
+### Ignore Files
+
+Create a `.perflensignore` file in your project root to exclude files and directories from analysis. Uses gitignore syntax:
+
+```plaintext
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Test files
+**/*.test.js
+**/*.spec.js
+coverage/
+
+# Other common excludes
+.git/
+*.min.js
+*.bundle.js
+public/
+mock-api/
+```
+
+You can also specify ignore patterns in your config file:
+```javascript
+{
+  ignore: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/.git/**',
+    '**/coverage/**',
+    '**/*.min.js',
+    '**/*.bundle.js'
+  ]
+}
+```
+
+Patterns from both sources will be combined.
 
 ## How It Works
 
