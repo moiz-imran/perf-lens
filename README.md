@@ -1,27 +1,34 @@
-# PerfLens
+# PerfLens 🔍
 
-AI-powered frontend performance optimizer that analyzes your React, Vue, or other frontend projects for performance issues and provides intelligent suggestions for improvement.
+A performance analysis tool that combines Lighthouse performance audits with static code analysis to help optimize your web applications.
 
 ## Features
 
-- 🌟 Comprehensive Lighthouse Performance Analysis
-  - Core Web Vitals Metrics
-  - Performance Opportunities
-  - JavaScript and CSS Analysis
-  - Network Performance Breakdown
-- 🧠 AI-Powered Code Analysis with Lighthouse Context
-  - Smart File Prioritization
-  - Token-Optimized Processing
-  - Framework-Aware Analysis
-- 📊 Detailed Performance Reports
-  - Runtime Performance Metrics
-  - Code-Level Optimization Suggestions
-  - Actionable Recommendations
-  - Export to Markdown or HTML
-- ⚡️ Smart Batch Processing
-  - Configurable Analysis Limits
-  - Automatic Token Management
-  - Efficient Memory Usage
+### 🌟 Lighthouse Performance Analysis
+- Core Web Vitals measurement and scoring
+- Performance bottleneck detection
+- Resource usage analysis:
+  - JavaScript execution and bundle size
+  - CSS optimization opportunities
+  - Network request analysis
+  - Resource loading optimization
+
+### 🧠 Static Code Analysis
+- Framework-aware code scanning
+- Performance pattern detection
+- Batch processing of files with:
+  - Smart file prioritization
+  - Size-based filtering
+  - Framework-specific analysis
+
+### 📊 Rich Reporting
+- Detailed HTML reports with:
+  - Performance metrics dashboard
+  - Critical issues highlighting
+  - Code snippets with context
+  - Actionable recommendations
+- Markdown report generation
+- File-specific insights
 
 ## Installation
 
@@ -31,105 +38,97 @@ npm install -g perf-lens
 yarn global add perf-lens
 ```
 
-## Configuration
-
-First, set up your OpenAI API key (required for AI analysis). You only need to do this once:
-
-```bash
-perf-lens config set-key YOUR_API_KEY
-```
-
-You can also use the `OPENAI_API_KEY` environment variable if you prefer.
-
-To verify your configuration:
-
-```bash
-perf-lens config get-key
-```
-
 ## Usage
 
-Basic scan with default settings:
+### Basic Analysis
+
+Run a performance analysis on your development server:
+
 ```bash
 perf-lens scan
 ```
 
-Save report as Markdown:
+The tool will automatically detect your development server port.
+
+### Configuration
+
+Set your OpenAI API key (required for code analysis):
+
+```bash
+perf-lens config set-key YOUR_API_KEY
+# or use environment variable:
+export OPENAI_API_KEY=your_key_here
+```
+
+### Generate Reports
+
+Save analysis as Markdown:
 ```bash
 perf-lens scan --output report.md
 ```
 
-Save report as HTML with custom settings:
+Generate HTML report:
 ```bash
-perf-lens scan --output report.html --format html --max-files 50 --batch-size 10
+perf-lens scan --output report.html --format html
 ```
 
-Advanced usage with custom limits:
-```bash
-perf-lens scan --max-files 50 --batch-size 10 --max-tokens 60000
-```
+### Advanced Options
 
-### Configuration Options
+Customize the analysis:
+```bash
+perf-lens scan --max-files 50 --batch-size 10 --max-size 100
+```
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--max-files` | Maximum number of files to analyze | 200 |
-| `--batch-size` | Number of files per batch | 20 |
-| `--max-size` | Maximum file size in KB | 100 |
-| `--batch-delay` | Delay between batches in ms | 1000 |
-| `--max-tokens` | Maximum tokens per batch | 100000 |
-| `--output` | Output file path for the report | - |
-| `--format` | Output format (`md` or `html`) | md |
+| \`--max-files\` | Maximum files to analyze | 200 |
+| \`--batch-size\` | Files per batch | 20 |
+| \`--max-size\` | Maximum file size (KB) | 100 |
+| \`--batch-delay\` | Delay between batches (ms) | 1000 |
+| \`--output\` | Report output path | - |
+| \`--format\` | Output format (md/html) | md |
 
 ## How It Works
 
-PerfLens combines Lighthouse performance audits with AI-powered code analysis to provide comprehensive performance insights:
+### 1. Development Server Analysis
+- Automatically detects your dev server
+- Runs Lighthouse performance audits
+- Collects Core Web Vitals metrics
+- Analyzes resource usage
 
-### 1. Lighthouse Analysis
-- Runs performance audits on your development server
-- Analyzes Core Web Vitals and key metrics
-- Identifies performance bottlenecks
-- Provides detailed breakdown of:
-  - JavaScript and CSS issues
-  - Resource loading optimization
-  - Network performance
-  - Asset optimization opportunities
-
-### 2. AI-Powered Code Analysis
-- Analyzes your codebase with Lighthouse context
+### 2. Code Analysis
+- Scans your codebase for:
+  - Performance bottlenecks
+  - Resource optimization opportunities
+  - Bundle size issues
+  - Loading optimizations
 - Prioritizes files based on:
   - Entry points and key components
-  - Framework-specific patterns
   - File size and complexity
-- Processes files in optimized batches to manage:
-  - Token limits
-  - Memory usage
-  - API rate limits
+  - Framework patterns
 
-### 3. Framework Support
-Specialized analysis for:
-- React and Next.js
-- Vue and Nuxt
-- Svelte and SvelteKit
-- Angular
-- Astro
-- And more!
-
-### 4. Output Format
-Two comprehensive reports:
-1. 🌟 Lighthouse Performance Report
-   - Runtime metrics and scores
+### 3. Report Generation
+Generates comprehensive reports with:
+1. Performance Metrics
+   - Core Web Vitals scores
    - Performance opportunities
-   - Resource optimization suggestions
+   - Resource usage breakdown
 
-2. 🧠 Code Analysis Report
-   - Critical issues
-   - Warnings
-   - Improvement suggestions
-   - File-specific recommendations
+2. Code Analysis
+   - Critical performance issues
+   - Warnings and suggestions
+   - Code-level recommendations
+
+## Supported File Types
+- JavaScript (\`.js\`, \`.jsx\`)
+- TypeScript (\`.ts\`, \`.tsx\`)
+- Vue (\`.vue\`)
+- Svelte (\`.svelte\`)
+- Astro (\`.astro\`)
+- Stylesheets (\`.css\`, \`.scss\`, \`.less\`, \`.sass\`)
+- HTML (\`.html\`)
 
 ## Requirements
-
 - Node.js >= 18
 - Running development server
 - OpenAI API Key
@@ -137,3 +136,7 @@ Two comprehensive reports:
 ## License
 
 MIT
+
+---
+
+Built with ❤️ by the Moiz Imran
