@@ -1,6 +1,6 @@
 {
   "name": "perf-lens",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "description": "AI-powered frontend performance optimizer",
   "main": "dist/index.js",
   "type": "module",
@@ -34,7 +34,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/moizimran/scan-ui.git"
+    "url": "git+https://github.com/moizimran/perf-lens.git"
   },
   "engines": {
     "node": ">=18"
