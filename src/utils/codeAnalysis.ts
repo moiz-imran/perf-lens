@@ -6,12 +6,20 @@ import { OpenAI } from 'openai';
 import { getApiKey } from './ai.js';
 import type { AnalysisConfig } from '../types/config.js';
 
-// File extensions to analyze
-const EXTENSIONS_TO_ANALYZE = [
-  '.js', '.jsx', '.ts', '.tsx',
-  '.vue', '.svelte', '.astro',
-  '.css', '.scss', '.less', '.sass',
-  '.html'
+// Default file patterns to include if none specified
+const DEFAULT_INCLUDE_PATTERNS = [
+  '**/*.js',
+  '**/*.jsx',
+  '**/*.ts',
+  '**/*.tsx',
+  '**/*.vue',
+  '**/*.svelte',
+  '**/*.astro',
+  '**/*.css',
+  '**/*.scss',
+  '**/*.less',
+  '**/*.sass',
+  '**/*.html'
 ];
 
 // Maximum file size to analyze (in bytes)
@@ -66,9 +74,20 @@ function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
 }
 
 /**
- * Recursively find all files in a directory that match the given extensions
+ * Check if a file should be included based on patterns
  */
-function findFiles(dir: string, extensions: string[], config: AnalysisConfig & { ignore?: string[] }): string[] {
+function shouldIncludeFile(filePath: string, includePatterns: string[]): boolean {
+  const relativePath = path.relative(process.cwd(), filePath);
+  return includePatterns.some(pattern => {
+    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\//g, '\\/'));
+    return regex.test(relativePath);
+  });
+}
+
+/**
+ * Recursively find all files in a directory that match the given patterns
+ */
+function findFiles(dir: string, config: AnalysisConfig): string[] {
   if (!fs.existsSync(dir)) {
     return [];
   }
@@ -76,6 +95,7 @@ function findFiles(dir: string, extensions: string[], config: AnalysisConfig & {
   let results: string[] = [];
   const list = fs.readdirSync(dir);
   const ignorePatterns = config.ignore || [];
+  const includePatterns = config.include || DEFAULT_INCLUDE_PATTERNS;
 
   for (const file of list) {
     const filePath = path.join(dir, file);
@@ -87,9 +107,9 @@ function findFiles(dir: string, extensions: string[], config: AnalysisConfig & {
     }
 
     if (stat.isDirectory()) {
-      results = results.concat(findFiles(filePath, extensions, config));
+      results = results.concat(findFiles(filePath, config));
     } else if (
-      extensions.includes(path.extname(file)) &&
+      shouldIncludeFile(filePath, includePatterns) &&
       stat.size <= (config.maxFileSize || MAX_FILE_SIZE)
     ) {
       results.push(filePath);
@@ -494,7 +514,6 @@ export async function analyzeCodebase(config: AnalysisConfig & {
     metrics: string;
     analysis: string;
   };
-  ignore?: string[];
 }): Promise<CodeAnalysisResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -520,7 +539,7 @@ export async function analyzeCodebase(config: AnalysisConfig & {
   }
 
   // Find all files to analyze
-  const allFiles = findFiles(baseDir, EXTENSIONS_TO_ANALYZE, config);
+  const allFiles = findFiles(baseDir, config);
 
   spinner.succeed(`Found ${allFiles.length} files to analyze in ${path.relative(process.cwd(), baseDir) || '.'}`);
 

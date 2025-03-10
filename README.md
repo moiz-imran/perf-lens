@@ -96,127 +96,159 @@ perf-lens scan --max-files 50 --batch-size 10 --max-size 100
 
 ### Configuration File
 
-PerfLens supports configuration files in multiple formats. Create any of these files in your project root:
-- `.perflensrc.js` or `perflens.config.js` (JavaScript with ES modules)
-- `.perflensrc.json` (JSON format)
-- `.perflensrc.yaml` or `.perflensrc.yml` (YAML format)
-- `package.json` with a "perflens" field
+Create a `perflens.config.js` file in your project root:
 
-Example configuration (`perflens.config.js`):
 ```javascript
 /** @type {import('perf-lens').PerflensConfig} */
 export default {
-  // Analysis configuration
-  analysis: {
-    batchDelay: 1000, // Delay between batches in milliseconds
-    batchSize: 20, // Number of files to analyze per batch
-    maxFileSize: 102400, // Maximum file size in bytes (100KB)
-    maxFiles: 200, // Maximum number of files to analyze
-    maxTokensPerBatch: 10000, //
-    targetDir: 'src' // Directory to scan, relative to cwd
+  // Performance thresholds
+  thresholds: {
+    performance: 90,
+    firstContentfulPaint: 2000,
+    largestContentfulPaint: 2500,
+    totalBlockingTime: 200,
+    cumulativeLayoutShift: 0.1,
+    speedIndex: 3000,
+    timeToInteractive: 3800
   },
 
   // Bundle size thresholds
   bundleThresholds: {
-    maxAssetSize: '100kb', // Maximum size for any asset
-    maxBundleSize: '250kb', // Maximum total bundle size
-    maxChunkSize: '50kb', // Maximum chunk size
-    maxFontSize: '50kb', // Maximum size for font files
-    maxImageSize: '100kb' // Maximum size for images
+    maxBundleSize: '250kb',
+    maxChunkSize: '50kb',
+    maxAssetSize: '100kb',
+    maxImageSize: '100kb',
+    maxFontSize: '50kb'
+  },
+
+  // Analysis configuration
+  analysis: {
+    maxFiles: 200,
+    batchSize: 20,
+    maxFileSize: 102400, // 100KB
+    batchDelay: 1000,
+    targetDir: 'src',
+    include: [ // File patterns to include
+      '**/*.js',
+      '**/*.jsx',
+      '**/*.ts',
+      '**/*.tsx',
+      '**/*.vue',
+      '**/*.svelte',
+      '**/*.astro',
+      '**/*.css',
+      '**/*.scss',
+      '**/*.less',
+      '**/*.sass',
+      '**/*.html'
+    ],
+    ignore: [ // Patterns to ignore (in addition to .perflensignore)
+      // Build and dependency directories
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.git/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/.nuxt/**',
+      '**/.svelte-kit/**',
+      '**/.astro/**',
+
+      // Generated and minified files
+      '**/*.min.js',
+      '**/*.bundle.js',
+      '**/*.chunk.js',
+      '**/*.map',
+      '**/*.d.ts',
+
+      // Test files
+      '**/*.test.*',
+      '**/*.spec.*',
+      '**/__tests__/**',
+      '**/__mocks__/**',
+      '**/test/**',
+      '**/tests/**',
+
+      // Documentation and examples
+      '**/docs/**',
+      '**/examples/**',
+      '**/demo/**',
+      '**/demos/**',
+
+      // Configuration files
+      '**/*.config.*',
+      '**/*.rc.*',
+      '**/tsconfig.json',
+      '**/package.json',
+      '**/package-lock.json',
+      '**/yarn.lock',
+      '**/pnpm-lock.yaml',
+
+      // Editor and IDE files
+      '**/.vscode/**',
+      '**/.idea/**',
+      '**/.DS_Store',
+
+      // Temporary and cache files
+      '**/.cache/**',
+      '**/.temp/**',
+      '**/.tmp/**',
+      '**/tmp/**',
+      '**/temp/**'
+    ]
   },
 
   // Lighthouse configuration
   lighthouse: {
-    port: 3001, // Development server port
-    mobileEmulation: true, // Enable mobile emulation
+    port: 3000,
+    mobileEmulation: true,
     throttling: {
-      cpu: 4, // CPU slowdown multiplier
-      network: 'fast3G' // Network throttling preset
+      cpu: 4,
+      network: 'fast3G'
     }
   },
 
   // Output configuration
   output: {
-    directory: './reports', // Output directory
-    filename: 'performance-report', // Base filename (without extension)
-    format: 'html', // 'md' or 'html'
-    includeTimestamp: true // Add timestamp to filename
-  },
-
-  // Performance score thresholds
-  thresholds: {
-    performance: 90, // Minimum overall Lighthouse performance score
-    firstContentfulPaint: 2000, // Maximum FCP in milliseconds
-    largestContentfulPaint: 2500, // Maximum LCP in milliseconds
-    totalBlockingTime: 200, // Maximum TBT in milliseconds
-    cumulativeLayoutShift: 0.1, // Maximum CLS score
-    speedIndex: 3000, // Maximum Speed Index in milliseconds
-    timeToInteractive: 3800 // Maximum TTI in milliseconds
-  },
-
-  // Custom rules configuration
-  rules: {
-    'minify-javascript': {
-      severity: 'error'
-    },
-    'no-render-blocking-resources': {
-      severity: 'error',
-      threshold: 500 // Maximum blocking time in ms
-    },
-    'optimize-images': {
-      severity: 'warning',
-      options: {
-        lazy: true, // Use lazy loading
-        webp: true // Convert images to WebP
-      }
-    }
+    format: 'html',
+    directory: './reports',
+    filename: 'performance-report',
+    includeTimestamp: true
   }
 };
 ```
 
 ### Ignore Files
 
-Create a `.perflensignore` file in your project root to exclude files and directories from analysis. Uses gitignore syntax:
+Create a `.perflensignore` file in your project root to specify additional files to ignore:
 
-```plaintext
-# Dependencies
-node_modules/
-**/node_modules/
-
-# Build outputs
+```text
+# Build output
 dist/
 build/
-out/
+.next/
+.nuxt/
+
+# Dependencies
+node_modules/
+.pnpm-store/
 
 # Test files
-**/*.test.js
-**/*.spec.js
-coverage/
+__tests__/
+*.test.*
+*.spec.*
 
-# Other common excludes
-.git/
-*.min.js
-*.bundle.js
-public/
-mock-api/
+# Documentation
+docs/
+examples/
+
+# Editor files
+.vscode/
+.idea/
+.DS_Store
 ```
 
-You can also specify ignore patterns in your config file:
-```javascript
-{
-  ignore: [
-    '**/node_modules/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/.git/**',
-    '**/coverage/**',
-    '**/*.min.js',
-    '**/*.bundle.js'
-  ]
-}
-```
-
-Patterns from both sources will be combined.
+The ignore patterns from `.perflensignore` are automatically merged with the patterns specified in the `analysis.ignore` section of your config file.
 
 ## How It Works
 

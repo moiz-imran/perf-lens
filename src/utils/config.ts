@@ -27,7 +27,75 @@ export const DEFAULT_CONFIG: PerflensConfig = {
     batchSize: 20,
     maxFileSize: 100 * 1024, // 100KB
     maxTokensPerBatch: 100000,
-    batchDelay: 1000
+    batchDelay: 1000,
+    include: [
+      '**/*.js',
+      '**/*.jsx',
+      '**/*.ts',
+      '**/*.tsx',
+      '**/*.vue',
+      '**/*.svelte',
+      '**/*.astro',
+      '**/*.css',
+      '**/*.scss',
+      '**/*.less',
+      '**/*.sass',
+      '**/*.html'
+    ],
+    ignore: [
+      // Build and dependency directories
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.git/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/.nuxt/**',
+      '**/.svelte-kit/**',
+      '**/.astro/**',
+
+      // Generated and minified files
+      '**/*.min.js',
+      '**/*.bundle.js',
+      '**/*.chunk.js',
+      '**/*.map',
+      '**/*.d.ts',
+
+      // Test files
+      '**/*.test.*',
+      '**/*.spec.*',
+      '**/__tests__/**',
+      '**/__mocks__/**',
+      '**/test/**',
+      '**/tests/**',
+
+      // Documentation and examples
+      '**/docs/**',
+      '**/examples/**',
+      '**/demo/**',
+      '**/demos/**',
+
+      // Configuration files
+      '**/*.config.*',
+      '**/*.rc.*',
+      '**/tsconfig.json',
+      '**/package.json',
+      '**/package-lock.json',
+      '**/yarn.lock',
+      '**/pnpm-lock.yaml',
+
+      // Editor and IDE files
+      '**/.vscode/**',
+      '**/.idea/**',
+      '**/.DS_Store',
+
+      // Temporary and cache files
+      '**/.cache/**',
+      '**/.temp/**',
+      '**/.tmp/**',
+      '**/tmp/**',
+      '**/temp/**'
+    ]
   },
   lighthouse: {
     mobileEmulation: true,
@@ -36,15 +104,6 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       network: 'fast3G'
     }
   },
-  ignore: [
-    '**/node_modules/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/.git/**',
-    '**/coverage/**',
-    '**/*.min.js',
-    '**/*.bundle.js'
-  ],
   output: {
     format: 'md',
     includeTimestamp: true
@@ -77,7 +136,9 @@ const configSchema = z.object({
     maxFileSize: z.number().positive().optional(),
     batchDelay: z.number().nonnegative().optional(),
     maxTokensPerBatch: z.number().positive().optional(),
-    targetDir: z.string().optional()
+    targetDir: z.string().optional(),
+    include: z.array(z.string()).optional(),
+    ignore: z.array(z.string()).optional()
   }).optional(),
 
   lighthouse: z.object({
@@ -88,8 +149,6 @@ const configSchema = z.object({
       network: z.enum(['slow3G', 'fast3G', '4G', 'none']).optional()
     }).optional()
   }).optional(),
-
-  ignore: z.array(z.string()).optional(),
 
   rules: z.record(z.object({
     severity: z.enum(['error', 'warning', 'info']),
@@ -156,8 +215,12 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
     const configDir = configPath ? path.dirname(configPath) : process.cwd();
     const ignorePatterns = loadIgnorePatterns(configDir);
     if (ignorePatterns.length > 0) {
-      actualConfig.ignore = [
-        ...(actualConfig.ignore || []),
+      // Ensure analysis config exists
+      actualConfig.analysis = actualConfig.analysis || {};
+
+      // Merge ignore patterns into analysis.ignore
+      actualConfig.analysis.ignore = [
+        ...(actualConfig.analysis.ignore || []),
         ...ignorePatterns
       ];
     }

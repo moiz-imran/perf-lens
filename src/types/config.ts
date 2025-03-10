@@ -23,6 +23,8 @@ export interface AnalysisConfig {
   batchDelay?: number;
   maxTokensPerBatch?: number;
   targetDir?: string;  // Directory to scan, relative to cwd
+  include?: string[];  // File patterns to include (e.g. ['**/*.ts', '**/*.tsx'])
+  ignore?: string[];   // File patterns to ignore
 }
 
 export interface LighthouseConfig {

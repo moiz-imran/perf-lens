@@ -26,19 +26,76 @@ export default {
     batchSize: 20, // Number of files to analyze per batch
     maxFileSize: 102400, // Maximum file size in bytes (100KB)
     batchDelay: 1000, // Delay between batches in milliseconds
-    targetDir: 'src' // Directory to scan (relative to project root)
-  },
+    targetDir: 'src', // Directory to scan (relative to project root)
+    include: [ // File patterns to include (defaults to common frontend file types)
+      '**/*.js',
+      '**/*.jsx',
+      '**/*.ts',
+      '**/*.tsx',
+      '**/*.vue',
+      '**/*.svelte',
+      '**/*.astro',
+      '**/*.css',
+      '**/*.scss',
+      '**/*.less',
+      '**/*.sass',
+      '**/*.html'
+    ],
+    ignore: [ // Patterns to ignore (in addition to .perflensignore)
+      // Build and dependency directories
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.git/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/.nuxt/**',
+      '**/.svelte-kit/**',
+      '**/.astro/**',
 
-  // Patterns to ignore (in addition to .perflensignore)
-  ignore: [
-    '**/node_modules/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/.git/**',
-    '**/coverage/**',
-    '**/*.min.js',
-    '**/*.bundle.js'
-  ],
+      // Generated and minified files
+      '**/*.min.js',
+      '**/*.bundle.js',
+      '**/*.chunk.js',
+      '**/*.map',
+      '**/*.d.ts',
+
+      // Test files
+      '**/*.test.*',
+      '**/*.spec.*',
+      '**/__tests__/**',
+      '**/__mocks__/**',
+      '**/test/**',
+      '**/tests/**',
+
+      // Documentation and examples
+      '**/docs/**',
+      '**/examples/**',
+      '**/demo/**',
+      '**/demos/**',
+
+      // Configuration files
+      '**/*.config.*',
+      '**/*.rc.*',
+      '**/tsconfig.json',
+      '**/package.json',
+      '**/package-lock.json',
+      '**/yarn.lock',
+      '**/pnpm-lock.yaml',
+
+      // Editor and IDE files
+      '**/.vscode/**',
+      '**/.idea/**',
+      '**/.DS_Store',
+
+      // Temporary and cache files
+      '**/.cache/**',
+      '**/.temp/**',
+      '**/.tmp/**',
+      '**/tmp/**',
+      '**/temp/**'
+    ],
+  },
 
   // Custom rules configuration
   rules: {
