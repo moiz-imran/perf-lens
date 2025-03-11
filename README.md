@@ -74,49 +74,28 @@ The tool will automatically detect your development server port.
 
 ### Configuration
 
-Set your OpenAI API key (required for code analysis):
+#### AI Provider Configuration
+
+PerfLens supports multiple AI providers for code analysis. You can configure your preferred provider using environment variables or the config CLI:
 
 ```bash
-perf-lens config set-key YOUR_API_KEY
+# OpenAI (default)
+perf-lens config set-key YOUR_API_KEY --provider openai
 # or use environment variable:
-export OPENAI_API_KEY=your_key_here
+export PERF_LENS_OPENAI_API_KEY=your_key_here
+
+# Anthropic
+perf-lens config set-key YOUR_API_KEY --provider anthropic
+# or use environment variable:
+export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
+
+# Google (Gemini)
+perf-lens config set-key YOUR_API_KEY --provider gemini
+# or use environment variable:
+export PERF_LENS_GEMINI_API_KEY=your_key_here
 ```
 
-### Generate Reports
-
-Save analysis as Markdown:
-```bash
-perf-lens scan --output report.md
-```
-
-Generate HTML report:
-```bash
-perf-lens scan --output report.html --format html
-```
-
-### Advanced Options
-
-Customize the analysis:
-```bash
-perf-lens scan --max-files 50 --batch-size 10 --max-size 100
-```
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-c, --config` | Path to config file | - |
-| `-p, --port` | Development server port | auto-detect |
-| `-t, --target` | Target directory to scan | current directory |
-| `-f, --max-files` | Maximum files to analyze | 200 |
-| `-b, --batch-size` | Files per batch | 20 |
-| `-s, --max-size` | Maximum file size (KB) | 100 |
-| `-d, --batch-delay` | Delay between batches (ms) | 1000 |
-| `-o, --output` | Report output path | - |
-| `--format` | Output format (md/html) | md |
-| `--mobile` | Enable mobile emulation | false |
-| `--cpu-throttle` | CPU slowdown multiplier | 4 |
-| `--network-throttle` | Network throttle type (slow3G/fast3G/4G/none) | fast3G |
-
-### Configuration File
+#### Configuration File
 
 Create a `perflens.config.js` file in your project root:
 
@@ -236,8 +215,50 @@ export default {
     directory: './reports',
     filename: 'performance-report',
     includeTimestamp: true
+  },
+
+  // AI model configuration
+  aiConfig: {
+    provider: 'openai', // 'openai' | 'anthropic' | 'gemini'
+    model: 'o3-mini', // model identifier
+    temperature: 0.2, // controls randomness (0-1)
+    maxTokens: 4096 // maximum response length
   }
 };
+```
+
+### Advanced Options
+
+Customize the analysis:
+```bash
+perf-lens scan --max-files 50 --batch-size 10 --max-size 100
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-c, --config` | Path to config file | - |
+| `-p, --port` | Development server port | auto-detect |
+| `-t, --target` | Target directory to scan | current directory |
+| `-f, --max-files` | Maximum files to analyze | 200 |
+| `-b, --batch-size` | Files per batch | 20 |
+| `-s, --max-size` | Maximum file size (KB) | 100 |
+| `-d, --batch-delay` | Delay between batches (ms) | 1000 |
+| `-o, --output` | Report output path | - |
+| `--format` | Output format (md/html) | md |
+| `--mobile` | Enable mobile emulation | false |
+| `--cpu-throttle` | CPU slowdown multiplier | 4 |
+| `--network-throttle` | Network throttle type (slow3G/fast3G/4G/none) | fast3G |
+
+### Generate Reports
+
+Save analysis as Markdown:
+```bash
+perf-lens scan --output report.md
+```
+
+Generate HTML report:
+```bash
+perf-lens scan --output report.html --format html
 ```
 
 ### Ignore Files
@@ -323,4 +344,4 @@ MIT
 
 ---
 
-Built with ❤️ by the Moiz Imran
+Built with ❤️ by Moiz Imran

@@ -6,6 +6,7 @@ import type { PerflensConfig } from '../types/config';
 
 // Default configuration values
 export const DEFAULT_CONFIG: PerflensConfig = {
+  verbose: true,
   thresholds: {
     performance: 90,
     firstContentfulPaint: 2000,
@@ -26,7 +27,6 @@ export const DEFAULT_CONFIG: PerflensConfig = {
     maxFiles: 200,
     batchSize: 20,
     maxFileSize: 100 * 1024, // 100KB
-    maxTokensPerBatch: 100000,
     batchDelay: 1000,
     include: [
       '**/*.js',
@@ -104,6 +104,11 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       network: 'fast3G'
     }
   },
+  ai: {
+    provider: 'openai',
+    model: 'o3-mini',
+    temperature: 0.2,
+  },
   output: {
     format: 'md',
     includeTimestamp: true
@@ -112,6 +117,8 @@ export const DEFAULT_CONFIG: PerflensConfig = {
 
 // Zod schema for config validation
 const configSchema = z.object({
+  verbose: z.boolean().optional(),
+
   thresholds: z.object({
     performance: z.number().min(0).max(100).optional(),
     firstContentfulPaint: z.number().positive().optional(),
@@ -135,7 +142,6 @@ const configSchema = z.object({
     batchSize: z.number().positive().optional(),
     maxFileSize: z.number().positive().optional(),
     batchDelay: z.number().nonnegative().optional(),
-    maxTokensPerBatch: z.number().positive().optional(),
     targetDir: z.string().optional(),
     include: z.array(z.string()).optional(),
     ignore: z.array(z.string()).optional()
@@ -148,6 +154,14 @@ const configSchema = z.object({
       cpu: z.number().positive().optional(),
       network: z.enum(['slow3G', 'fast3G', '4G', 'none']).optional()
     }).optional()
+  }).optional(),
+
+  ai: z.object({
+    provider: z.enum(['openai', 'anthropic', 'gemini']),
+    model: z.string(),
+    apiKey: z.string().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().positive().optional()
   }).optional(),
 
   rules: z.record(z.object({

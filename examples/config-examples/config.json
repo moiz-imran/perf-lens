@@ -24,5 +24,11 @@
     "node_modules/**",
     "dist/**",
     "build/**"
-  ]
+  ],
+  "ai": {
+    "provider": "openai",
+    "model": "o3-mini",
+    "temperature": 0.7,
+    "maxTokens": 100000
+  }
 }

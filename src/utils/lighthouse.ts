@@ -5,9 +5,9 @@ import chalk from 'chalk';
 import fs from 'fs';
 import inquirer from 'inquirer';
 import ora from 'ora';
-import { OpenAI } from 'openai';
-import { getApiKey } from './ai.js';
-import type { LighthouseConfig, BundleThresholds, PerformanceThresholds } from '../types/config.js';
+import { createModel } from './ai.js';
+import type { LighthouseConfig, BundleThresholds, PerformanceThresholds, AIModelConfig, GlobalConfig } from '../types/config.js';
+import { AIModel } from "../ai/models.js";
 
 // Add type definitions for Lighthouse audit details
 interface AuditItem {
@@ -520,17 +520,7 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
 /**
  * Analyze Lighthouse report with AI
  */
-async function analyzeLighthouseReport(report: Result): Promise<string> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "OpenAI API key not found! Please set it using:\n" +
-      "perf-lens config set-key YOUR_API_KEY\n" +
-      "Or set the OPENAI_API_KEY environment variable."
-    );
-  }
-
-  const openai = new OpenAI({ apiKey });
+async function analyzeLighthouseReport(report: Result, model: AIModel): Promise<string> {
   const spinner = ora('Analyzing Lighthouse results...').start();
 
   // Split analysis into focused sections
@@ -576,7 +566,7 @@ async function analyzeLighthouseReport(report: Result): Promise<string> {
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
 
-    const prompt = `You are a performance optimization expert for frontend web applications.
+    const prompt = `You are a performance optimization expert specializing in frontend web development.
 Please analyze this section of the Lighthouse performance report and provide detailed insights and recommendations.
 
 Section: ${section.name}
@@ -585,40 +575,111 @@ Performance Score: ${(report.categories.performance?.score || 0) * 100}%
 Data:
 ${JSON.stringify(section.data, null, 2)}
 
-Please provide a focused analysis that includes:
+IMPORTANT - You MUST follow these formatting rules:
 
-1. Key Findings
-   - Analysis of each metric/audit in this section
-   - Most significant issues identified
-   - Impact on overall performance
+1. Your response MUST be in Markdown format
+2. Use the following structure for your analysis:
 
-2. Detailed Recommendations
-   - Specific technical solutions for each issue
-   - Prioritized list of improvements
-   - Expected impact of each solution
-   - Code or configuration examples where applicable
+## Key Findings
 
-Format your response in a clear, structured manner.
-Focus on actionable insights and quantifiable improvements.
-Be specific about the impact of each issue and the potential benefits of fixing it.`;
+[List your key findings here, one per bullet point]
+- Finding 1
+- Finding 2
+...
+
+## Impact Analysis
+
+[For each metric, provide:]
+- Metric name
+- Current value
+- Target threshold
+- Impact on user experience
+- Severity (Critical/Warning/Good)
+
+## Recommendations
+
+[For each recommendation:]
+### Recommendation Title
+
+**Priority**: [Critical/High/Medium/Low]
+**Effort**: [Easy/Medium/Hard]
+**Impact**: [High/Medium/Low]
+
+**Problem**:
+[Clear description of the issue]
+
+**Solution**:
+[Detailed solution with code examples if applicable]
+
+**Expected Improvement**:
+[Quantified improvement estimate]
+
+3. NEVER include placeholder text like "[List your key findings here]"
+4. NEVER make assumptions about code you cannot see
+5. Base ALL recommendations on the actual data provided
+6. Use exact values from the data when discussing metrics
+7. Provide specific, actionable recommendations
+8. Include quantifiable improvements whenever possible
+9. Format code examples using triple backticks with language specification
+10. Separate sections with a blank line
+
+Example format:
+
+## Key Findings
+- First Contentful Paint is 2.3s, exceeding the recommended 1.8s threshold
+- Largest Contentful Paint shows poor performance at 4.1s
+
+## Impact Analysis
+- **First Contentful Paint:**
+  - **Current value:** 2.3s
+  - **Target threshold:** 1.8s
+  - **Impact:** Users perceive slower initial page load
+  - **Severity:** Warning
+
+## Recommendations
+
+### Optimize First Contentful Paint
+
+**Priority**: High
+**Effort**: Medium
+**Impact**: High
+
+**Problem**:
+Server response time of 1.2s contributes significantly to the FCP.
+
+**Solution**:
+Implement server-side caching and optimize database queries.
+
+**Expected Improvement**:
+- FCP reduction by 0.8s
+- 35% improvement in initial render time`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a performance optimization expert specializing in Lighthouse performance analysis." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 2000,
-      });
+      const systemPrompt = "You are a performance optimization expert specializing in Lighthouse performance analysis. Focus on providing actionable insights based on the data provided.";
+      const response = await model.generateSuggestions(prompt, systemPrompt);
+
+      if (!response || response.trim() === '') {
+        console.error(`Warning: Empty response received for ${section.name}`);
+        analysisResults.push({
+          section: section.name,
+          analysis: `No analysis available for ${section.name}. Please check the raw Lighthouse report for details.`
+        });
+        continue;
+      }
 
       analysisResults.push({
         section: section.name,
-        analysis: response.choices[0]?.message?.content || ''
+        analysis: response
       });
     } catch (error) {
       console.error(`Error analyzing ${section.name}:`, error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
       analysisResults.push({
         section: section.name,
         analysis: `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`
@@ -632,10 +693,16 @@ Be specific about the impact of each issue and the potential benefits of fixing 
   spinner.succeed('Lighthouse analysis complete');
 
   // Return the section analyses
-  return analysisResults.map(r => `## ${r.section}\n${r.analysis}`).join('\n\n');
+  return analysisResults.map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`).join('\n\n');
 }
 
-export async function runLighthouse(config?: LighthouseConfig & { bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds }): Promise<{
+export async function runLighthouse(
+  config?: LighthouseConfig & {
+    bundleThresholds?: BundleThresholds,
+    performanceThresholds?: PerformanceThresholds,
+    ai?: AIModelConfig
+  } & GlobalConfig,
+): Promise<{
   metrics: string;
   report: string;
   analysis: string;
@@ -656,6 +723,9 @@ export async function runLighthouse(config?: LighthouseConfig & { bundleThreshol
   }
 
   const chrome = await chromeLauncher.launch({chromeFlags: ['--headless']});
+  let retryCount = 0;
+  const maxRetries = config?.retries || 3;
+  const timeout = config?.timeout || 30000; // 30 seconds default timeout
 
   const options: Flags = {
     logLevel: 'error' as const,
@@ -707,37 +777,61 @@ export async function runLighthouse(config?: LighthouseConfig & { bundleThreshol
     }
   };
 
-  try {
-    console.log(chalk.blue(`\nRunning Lighthouse on http://localhost:${port}`));
-    const runnerResult = await lighthouse(`http://localhost:${port}`, options);
-    if (!runnerResult?.lhr) {
-      throw new Error('Failed to get Lighthouse results');
+  const model = createModel(config?.ai || { provider: 'openai', model: 'o3-mini' });
+
+  while (retryCount < maxRetries) {
+    try {
+      if (config?.verbose) {
+        console.log(chalk.blue(`\nRunning Lighthouse on http://localhost:${port} (Attempt ${retryCount + 1}/${maxRetries})`));
+      }
+
+      const runnerResult = await Promise.race([
+        lighthouse(`http://localhost:${port}`, options),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Lighthouse analysis timed out')), timeout)
+        )
+      ]) as { lhr: Result };
+
+      if (!runnerResult?.lhr) {
+        throw new Error('Failed to get Lighthouse results');
+      }
+
+      const report = runnerResult.lhr;
+      await chrome.kill();
+
+      const formattedReport = formatLighthouseReport(report, config?.bundleThresholds, config?.performanceThresholds);
+      const consoleOutput = formatConsoleOutput(report, config?.performanceThresholds);
+      const analysis = await analyzeLighthouseReport(report, model);
+
+      const score = (report.categories.performance?.score || 0) * 100;
+      const metrics = report.audits;
+
+      const metricsString = `Performance Score: ${score.toFixed(0)}%\n` +
+             `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n` +
+             `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n` +
+             `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
+
+      return {
+        metrics: metricsString,
+        report: formattedReport,
+        analysis: analysis,
+        consoleOutput: consoleOutput,
+        fullReport: report
+      };
+    } catch (error) {
+      retryCount++;
+      if (retryCount === maxRetries) {
+        await chrome.kill();
+        throw error;
+      }
+      if (config?.verbose) {
+        console.log(chalk.yellow(`\nAttempt ${retryCount} failed. Retrying...`));
+      }
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
     }
-
-    const report = runnerResult.lhr;
-    await chrome.kill();
-
-    const formattedReport = formatLighthouseReport(report, config?.bundleThresholds, config?.performanceThresholds);
-    const consoleOutput = formatConsoleOutput(report, config?.performanceThresholds);
-    const analysis = await analyzeLighthouseReport(report);
-
-    const score = (report.categories.performance?.score || 0) * 100;
-    const metrics = report.audits;
-
-    const metricsString = `Performance Score: ${score.toFixed(0)}%\n` +
-           `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n` +
-           `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n` +
-           `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
-
-    return {
-      metrics: metricsString,
-      report: formattedReport,
-      analysis: analysis,
-      consoleOutput: consoleOutput,
-      fullReport: report
-    };
-  } catch (error) {
-    await chrome.kill();
-    throw error;
   }
+
+  await chrome.kill();
+  throw new Error('Failed to run Lighthouse after maximum retries');
 }

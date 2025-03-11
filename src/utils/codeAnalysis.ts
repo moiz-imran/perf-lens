@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
-import { OpenAI } from 'openai';
-import { getApiKey } from './ai.js';
-import type { AnalysisConfig } from '../types/config.js';
+import { createModel } from './ai.js';
+import type { AIModelConfig, AnalysisConfig, GlobalConfig } from '../types/config.js';
+import type { AIModel } from '../ai/models.js';
 
 // Default file patterns to include if none specified
 const DEFAULT_INCLUDE_PATTERNS = [
@@ -177,15 +177,15 @@ function groupFilesByType(files: string[]): Record<string, string[]> {
 async function analyzeFileGroup(
   groupName: string,
   files: string[],
-  openai: OpenAI,
-  config: AnalysisConfig,
+  model: AIModel,
+  config: AnalysisConfig & GlobalConfig,
   lighthouseContext?: { metrics: string; analysis: string }
 ): Promise<{ critical: string[], warnings: string[], suggestions: string[], fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> }> {
   if (files.length === 0) {
     return { critical: [], warnings: [], suggestions: [], fileIssues: {} };
   }
 
-  const spinner = ora(`Analyzing ${groupName} files...`).start();
+  const spinner = config.verbose ? ora(`Analyzing ${groupName} files...`).start() : null;
 
   // Prepare file contents for analysis
   const fileContents: Record<string, string> = {};
@@ -203,30 +203,34 @@ async function analyzeFileGroup(
     const size = content.length;
 
     // Check if adding this file would exceed our limits
-    if (totalSize + size <= (config.maxTokensPerBatch || 100000) && // Token limit
+    if (totalSize + size <= (model.getConfig().maxTokens || 100000) && // Token limit
         filesToAnalyze.length < (config.batchSize || 20) && // File count limit
         size <= (config.maxFileSize || MAX_FILE_SIZE)) { // Individual file size limit
       fileContents[file] = content;
       filesToAnalyze.push(file);
       totalSize += size;
     } else if (size > (config.maxFileSize || MAX_FILE_SIZE)) {
-      spinner.stop();
+      if (spinner) spinner.stop();
       console.log(chalk.yellow(`\nSkipping ${path.relative(process.cwd(), file)} (${Math.round(size / 1024)}KB) - exceeds size limit of ${Math.round((config.maxFileSize || 100 * 1024) / 1024)}KB`));
-      spinner.start();
+      if (spinner) spinner.start();
     }
   }
 
-  spinner.text = `Analyzing ${filesToAnalyze.length} ${groupName} files (${Math.round(totalSize / 1024)}KB)...`;
+  if (spinner) {
+    spinner.text = `Analyzing ${filesToAnalyze.length} ${groupName} files (${Math.round(totalSize / 1024)}KB)...`;
+  }
 
   // Print out the specific files being sent to the AI
-  spinner.stop();
-  console.log(chalk.blue.bold(`\nAnalyzing ${groupName} files:`));
-  filesToAnalyze.forEach((file, index) => {
-    const relativePath = path.relative(process.cwd(), file);
-    const fileSize = Math.round(fileContents[file].length / 1024);
-    console.log(`  ${index + 1}. ${chalk.cyan(relativePath)} (${fileSize}KB)`);
-  });
-  spinner.start();
+  if (config.verbose) {
+    if (spinner) spinner.stop();
+    console.log(chalk.blue.bold(`\nAnalyzing ${groupName} files:`));
+    filesToAnalyze.forEach((file, index) => {
+      const relativePath = path.relative(process.cwd(), file);
+      const fileSize = Math.round(fileContents[file].length / 1024);
+      console.log(`  ${index + 1}. ${chalk.cyan(relativePath)} (${fileSize}KB)`);
+    });
+    if (spinner) spinner.start();
+  }
 
   // Create analysis prompt
   const prompt = `You are a performance optimization expert specializing in frontend web development.
@@ -303,6 +307,17 @@ useEffect(() => {
 \`\`\`
 Expected Improvement: Prevents memory leak of ~1KB per resize event listener
 
+CRITICAL issues should use 🚨
+WARNING issues should use ⚠️
+SUGGESTION issues should use 💡
+
+Each issue MUST be separated by exactly two newlines.
+The first line of each issue MUST start with one of these emojis followed by a space and the filepath:line-range.
+The filepath MUST be relative to the project root.
+The line range MUST be in the format start-end (e.g., 45-48).
+The Description, Impact, Code Context, Solution, and Expected Improvement sections MUST be on separate lines.
+The Code Context section MUST be wrapped in triple backticks with the language specified.
+
 Focus on these performance aspects:
 - Render performance (unnecessary re-renders, expensive calculations)
 - Bundle size (large dependencies, code splitting opportunities)
@@ -313,20 +328,8 @@ Focus on these performance aspects:
 - Asset optimization (images, fonts, etc.)`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 2000,
-    });
-
-    const analysisText = response.choices[0]?.message?.content || '';
+    const systemPrompt = "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.";
+    const analysisText = await model.generateSuggestions(prompt, systemPrompt);
 
     // Parse issues with improved regex patterns that validate line numbers
     const parseIssues = (text: string, symbol: string): string[] => {
@@ -361,11 +364,11 @@ Focus on these performance aspects:
 
         const formattedIssue =
           `${symbol} ${filepath}:${startLine}-${endLine}\n` +
-          `Description: ${description.trim()}\n` +
-          `Impact: ${impact.trim()}\n` +
-          `Code Context:\n\`\`\`\n${codeContext.trim()}\n\`\`\`\n` +
-          `Solution: ${solution.trim()}\n` +
-          `Expected Improvement: ${improvement.trim()}`;
+          `**Description:** ${description.trim()}\n` +
+          `**Impact:** ${impact.trim()}\n` +
+          `**Code Context:**\n\`\`\`\n${codeContext.trim()}\n\`\`\`\n` +
+          `**Solution:** ${solution.trim()}\n` +
+          `**Expected Improvement:** ${improvement.trim()}`;
         issues.push(formattedIssue);
       }
 
@@ -407,7 +410,7 @@ Focus on these performance aspects:
     associateIssuesWithFiles(warnings, 'warnings');
     associateIssuesWithFiles(suggestions, 'suggestions');
 
-    spinner.succeed(`Analyzed ${filesToAnalyze.length} ${groupName} files`);
+    if (spinner) spinner.succeed(`Analyzed ${filesToAnalyze.length} ${groupName} files`);
 
     return {
       critical,
@@ -416,7 +419,7 @@ Focus on these performance aspects:
       fileIssues
     };
   } catch (error) {
-    spinner.fail(`Error analyzing ${groupName} files`);
+    if (spinner) spinner.fail(`Error analyzing ${groupName} files`);
     console.error(error);
     return { critical: [], warnings: [], suggestions: [], fileIssues: {} };
   }
@@ -427,8 +430,8 @@ Focus on these performance aspects:
  */
 async function processBatchedFiles(
   files: string[],
-  config: AnalysisConfig,
-  openai: OpenAI,
+  config: AnalysisConfig & GlobalConfig,
+  model: AIModel,
   lighthouseContext?: { metrics: string; analysis: string }
 ): Promise<CodeAnalysisResult> {
   const result: CodeAnalysisResult = {
@@ -465,23 +468,27 @@ async function processBatchedFiles(
       batches.push(groupFiles.slice(i, i + (config.batchSize || 20)));
     }
 
-    const spinner = ora(`Processing ${groupName} files in ${batches.length} batches...`).start();
+    const spinner = config.verbose ? ora(`Processing ${groupName} files in ${batches.length} batches...`).start() : null;
 
     for (let i = 0; i < batches.length; i++) {
-      spinner.text = `Processing ${groupName} batch ${i + 1}/${batches.length}...`;
+      if (spinner) {
+        spinner.text = `Processing ${groupName} batch ${i + 1}/${batches.length}...`;
+      }
 
       // Print files being analyzed in this batch
-      spinner.stop();
-      console.log(chalk.blue.bold(`\nAnalyzing ${groupName} batch ${i + 1}:`));
-      batches[i].forEach((file, index) => {
-        const relativePath = path.relative(process.cwd(), file);
-        const fileSize = Math.round(fs.statSync(file).size / 1024);
-        const priority = filePriorities.find(fp => fp.path === file)?.score || 0;
-        console.log(`  ${index + 1}. ${chalk.cyan(relativePath)} (${fileSize}KB) - Priority: ${priority}`);
-      });
-      spinner.start();
+      if (config.verbose) {
+        if (spinner) spinner.stop();
+        console.log(chalk.blue.bold(`\nAnalyzing ${groupName} batch ${i + 1}:`));
+        batches[i].forEach((file, index) => {
+          const relativePath = path.relative(process.cwd(), file);
+          const fileSize = Math.round(fs.statSync(file).size / 1024);
+          const priority = filePriorities.find(fp => fp.path === file)?.score || 0;
+          console.log(`  ${index + 1}. ${chalk.cyan(relativePath)} (${fileSize}KB) - Priority: ${priority}`);
+        });
+        if (spinner) spinner.start();
+      }
 
-      const batchResults = await analyzeFileGroup(groupName, batches[i], openai, config, lighthouseContext);
+      const batchResults = await analyzeFileGroup(groupName, batches[i], model, config, lighthouseContext);
 
       // Merge results
       result.critical.push(...batchResults.critical);
@@ -495,12 +502,14 @@ async function processBatchedFiles(
 
       // Add delay between batches
       if (i < batches.length - 1) {
-        spinner.text = `Waiting ${config.batchDelay || 1000}ms before next batch...`;
+        if (spinner) {
+          spinner.text = `Waiting ${config.batchDelay || 1000}ms before next batch...`;
+        }
         await new Promise(resolve => setTimeout(resolve, config.batchDelay || 1000));
       }
     }
 
-    spinner.succeed(`Completed analysis of ${groupName} files`);
+    if (spinner) spinner.succeed(`Completed analysis of ${groupName} files`);
   }
 
   return result;
@@ -514,18 +523,9 @@ export async function analyzeCodebase(config: AnalysisConfig & {
     metrics: string;
     analysis: string;
   };
-}): Promise<CodeAnalysisResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "OpenAI API key not found! Please set it using:\n" +
-      "perf-lens config set-key YOUR_API_KEY\n" +
-      "Or set the OPENAI_API_KEY environment variable."
-    );
-  }
-
-  const openai = new OpenAI({ apiKey });
-  const spinner = ora('Finding files to analyze...').start();
+  ai?: AIModelConfig;
+} & GlobalConfig): Promise<CodeAnalysisResult> {
+  const spinner = config.verbose ? ora('Finding files to analyze...').start() : null;
 
   // Determine the directory to scan
   const baseDir = config.targetDir
@@ -534,31 +534,38 @@ export async function analyzeCodebase(config: AnalysisConfig & {
 
   // Verify the directory exists
   if (!fs.existsSync(baseDir)) {
-    spinner.fail(`Target directory does not exist: ${baseDir}`);
+    if (spinner) spinner.fail(`Target directory does not exist: ${baseDir}`);
     throw new Error(`Target directory does not exist: ${baseDir}`);
   }
 
   // Find all files to analyze
   const allFiles = findFiles(baseDir, config);
 
-  spinner.succeed(`Found ${allFiles.length} files to analyze in ${path.relative(process.cwd(), baseDir) || '.'}`);
-
-  // Print summary of files found
-  console.log(chalk.blue.bold('\nFiles found by type:'));
-  const filesByExt = allFiles.reduce((acc, file) => {
-    const ext = path.extname(file);
-    acc[ext] = (acc[ext] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  Object.entries(filesByExt).forEach(([ext, count]) => {
-    console.log(`${chalk.yellow(ext)}: ${count} files`);
-  });
-
-  if (allFiles.length > (config.maxFiles || 200)) {
-    console.log(chalk.yellow(`\nNote: Found ${allFiles.length} files, but will only analyze the ${config.maxFiles || 200} highest priority files.`));
+  if (spinner) {
+    spinner.succeed(`Found ${allFiles.length} files to analyze in ${path.relative(process.cwd(), baseDir) || '.'}`);
   }
 
+  // Print summary of files found
+  if (config.verbose) {
+    console.log(chalk.blue.bold('\nFiles found by type:'));
+    const filesByExt = allFiles.reduce((acc, file) => {
+      const ext = path.extname(file);
+      acc[ext] = (acc[ext] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    Object.entries(filesByExt).forEach(([ext, count]) => {
+      console.log(`${chalk.yellow(ext)}: ${count} files`);
+    });
+
+    if (allFiles.length > (config.maxFiles || 200)) {
+      console.log(chalk.yellow(`\nNote: Found ${allFiles.length} files, but will only analyze the ${config.maxFiles || 200} highest priority files.`));
+    }
+  }
+
+  // Create AI model instance
+  const model = createModel(config.ai || { provider: 'openai', model: 'o3-mini' });
+
   // Process files in batches with prioritization
-  return processBatchedFiles(allFiles, config, openai, config.lighthouseContext);
+  return processBatchedFiles(allFiles, config, model, config.lighthouseContext);
 }
