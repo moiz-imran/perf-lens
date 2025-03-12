@@ -21,7 +21,7 @@ export class OpenAIModel implements AIModel {
 
   async generateSuggestions(prompt: string, systemPrompt?: string): Promise<string> {
     const isReasoningModel = /^o/.test(this.config.model);
-    const response = await this.client.chat.completions.create({
+    const stream = await this.client.chat.completions.create({
       model: this.config.model,
       messages: [
         {
@@ -32,9 +32,17 @@ export class OpenAIModel implements AIModel {
       ],
       ...(isReasoningModel ? { reasoning_effort: 'high' } : { temperature: this.config.temperature || 0.2 }),
       max_completion_tokens: this.config.maxTokens,
+      stream: true
     });
 
-    return response.choices[0].message.content || '';
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      if (chunk.choices[0]?.delta?.content) {
+        fullResponse += chunk.choices[0].delta.content;
+      }
+    }
+
+    return fullResponse;
   }
 
   getConfig(): AIModelConfig {
@@ -54,15 +62,23 @@ export class AnthropicModel implements AIModel {
   }
 
   async generateSuggestions(prompt: string, systemPrompt?: string): Promise<string> {
-    const response = await this.client.messages.create({
+    const stream = await this.client.messages.create({
       model: this.config.model,
       system: systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.",
       messages: [{ role: 'user', content: prompt }],
       temperature: this.config.temperature || 0.2,
-      max_tokens: this.config.maxTokens || 100000,
+      max_tokens: this.config.maxTokens || 4096, // Anthropic's max tokens older models
+      stream: true
     });
 
-    return response.content[0].type === 'text' ? response.content[0].text : '';
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && 'text' in chunk.delta) {
+        fullResponse += chunk.delta.text;
+      }
+    }
+
+    return fullResponse;
   }
 
   getConfig(): AIModelConfig {
@@ -90,13 +106,21 @@ export class GeminiModel implements AIModel {
       },
       systemInstruction: systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
     });
-    const result = await model.generateContent({
+
+    const result = await model.generateContentStream({
       contents: [
         {role: 'user', parts: [{text: prompt}]},
       ],
     });
-    const response = result.response;
-    return response.text();
+
+    let fullResponse = '';
+    for await (const chunk of result.stream) {
+      if (chunk.text) {
+        fullResponse += chunk.text;
+      }
+    }
+
+    return fullResponse;
   }
 
   getConfig(): AIModelConfig {
