@@ -3,11 +3,13 @@
 This directory contains examples demonstrating how to use the PerfLens configuration system:
 
 1. **Basic Usage** (`basic-usage.ts`)
+
    - Shows how to load and use configuration
    - Demonstrates type-safe configuration access
    - Simple configuration overrides
 
 2. **Advanced Usage** (`advanced-usage.ts`)
+
    - Shows configuration merging
    - Demonstrates environment-based overrides
    - Error handling and validation

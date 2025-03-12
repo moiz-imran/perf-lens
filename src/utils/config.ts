@@ -16,13 +16,13 @@ export const DEFAULT_CONFIG: PerflensConfig = {
     cls: 0.1,
     speedIndex: 3000,
     tti: 3800,
-    fid: 100
+    fid: 100,
   },
   bundleThresholds: {
     maxInitialSize: '250kb',
     maxChunkSize: '50kb',
     maxAsyncChunks: 5,
-    maxTotalSize: '1mb'
+    maxTotalSize: '1mb',
   },
   analysis: {
     targetDir: '.',
@@ -42,7 +42,7 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       '**/*.scss',
       '**/*.less',
       '**/*.sass',
-      '**/*.html'
+      '**/*.html',
     ],
     ignore: [
       // Build and dependency directories
@@ -96,15 +96,15 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       '**/.temp/**',
       '**/.tmp/**',
       '**/tmp/**',
-      '**/temp/**'
-    ]
+      '**/temp/**',
+    ],
   },
   lighthouse: {
     mobileEmulation: true,
     throttling: {
       cpu: 4,
-      network: 'fast3G'
-    }
+      network: 'fast3G',
+    },
   },
   ai: {
     provider: 'anthropic',
@@ -114,75 +114,106 @@ export const DEFAULT_CONFIG: PerflensConfig = {
   },
   output: {
     format: 'md',
-    includeTimestamp: true
+    includeTimestamp: true,
   },
 };
 
 // Zod schema for config validation
-const configSchema = z.object({
-  // Global config
-  verbose: z.boolean().optional(),
+const configSchema = z
+  .object({
+    // Global config
+    verbose: z.boolean().optional(),
 
-  // AI config
-  ai: z.object({
-    provider: z.enum(['openai', 'anthropic', 'gemini']),
-    model: z.string(),
-    maxTokens: z.number().positive().optional(),
-    temperature: z.number().min(0).max(2).optional(),
-    apiKey: z.string().optional()
-  }).optional(),
+    // AI config
+    ai: z
+      .object({
+        provider: z.enum(['openai', 'anthropic', 'gemini']),
+        model: z.string(),
+        maxTokens: z.number().positive().optional(),
+        temperature: z.number().min(0).max(2).optional(),
+        apiKey: z.string().optional(),
+      })
+      .optional(),
 
-  // Performance thresholds
-  thresholds: z.object({
-    fcp: z.number().positive().optional(),
-    lcp: z.number().positive().optional(),
-    fid: z.number().positive().optional(),
-    cls: z.number().min(0).max(1).optional(),
-    tti: z.number().positive().optional(),
-    tbt: z.number().positive().optional(),
-    speedIndex: z.number().positive().optional(),
-    performance: z.number().min(0).max(100).optional()
-  }).strict().optional(), // Ensure correct property names
+    // Performance thresholds
+    thresholds: z
+      .object({
+        fcp: z.number().positive().optional(),
+        lcp: z.number().positive().optional(),
+        fid: z.number().positive().optional(),
+        cls: z.number().min(0).max(1).optional(),
+        tti: z.number().positive().optional(),
+        tbt: z.number().positive().optional(),
+        speedIndex: z.number().positive().optional(),
+        performance: z.number().min(0).max(100).optional(),
+      })
+      .strict()
+      .optional(), // Ensure correct property names
 
-  // Bundle thresholds
-  bundleThresholds: z.object({
-    maxInitialSize: z.string().regex(/^\d+(?:kb|mb|gb)$/i).optional(),
-    maxChunkSize: z.string().regex(/^\d+(?:kb|mb|gb)$/i).optional(),
-    maxAsyncChunks: z.number().nonnegative().optional(),
-    maxTotalSize: z.string().regex(/^\d+(?:kb|mb|gb)$/i).optional()
-  }).strict().optional(), // Ensure correct property names
+    // Bundle thresholds
+    bundleThresholds: z
+      .object({
+        maxInitialSize: z
+          .string()
+          .regex(/^\d+(?:kb|mb|gb)$/i)
+          .optional(),
+        maxChunkSize: z
+          .string()
+          .regex(/^\d+(?:kb|mb|gb)$/i)
+          .optional(),
+        maxAsyncChunks: z.number().nonnegative().optional(),
+        maxTotalSize: z
+          .string()
+          .regex(/^\d+(?:kb|mb|gb)$/i)
+          .optional(),
+      })
+      .strict()
+      .optional(), // Ensure correct property names
 
-  // Analysis config
-  analysis: z.object({
-    targetDir: z.string().optional(),
-    maxFiles: z.number().positive().optional(),
-    batchSize: z.number().positive().optional(),
-    maxFileSize: z.number().positive().optional(),
-    batchDelay: z.number().nonnegative().optional(),
-    ignore: z.array(z.string()).optional(),
-    include: z.array(z.string()).optional()
-  }).strict().optional(), // Ensure correct property names
+    // Analysis config
+    analysis: z
+      .object({
+        targetDir: z.string().optional(),
+        maxFiles: z.number().positive().optional(),
+        batchSize: z.number().positive().optional(),
+        maxFileSize: z.number().positive().optional(),
+        batchDelay: z.number().nonnegative().optional(),
+        ignore: z.array(z.string()).optional(),
+        include: z.array(z.string()).optional(),
+      })
+      .strict()
+      .optional(), // Ensure correct property names
 
-  // Lighthouse config
-  lighthouse: z.object({
-    port: z.number().positive().optional(),
-    mobileEmulation: z.boolean().optional(),
-    throttling: z.object({
-      cpu: z.number().positive().optional(),
-      network: z.enum(['slow3G', 'fast3G', '4G', 'none']).optional()
-    }).strict().optional(), // Ensure correct property names
-    timeout: z.number().positive().optional(),
-    retries: z.number().min(0).max(5).optional()
-  }).strict().optional(), // Ensure correct property names
+    // Lighthouse config
+    lighthouse: z
+      .object({
+        port: z.number().positive().optional(),
+        mobileEmulation: z.boolean().optional(),
+        throttling: z
+          .object({
+            cpu: z.number().positive().optional(),
+            network: z.enum(['slow3G', 'fast3G', '4G', 'none']).optional(),
+          })
+          .strict()
+          .optional(), // Ensure correct property names
+        timeout: z.number().positive().optional(),
+        retries: z.number().min(0).max(5).optional(),
+      })
+      .strict()
+      .optional(), // Ensure correct property names
 
-  // Output config
-  output: z.object({
-    directory: z.string().optional(),
-    filename: z.string().optional(),
-    format: z.enum(['md', 'html']).optional(),
-    includeTimestamp: z.boolean().optional()
-  }).strict().optional() // Ensure correct property names
-}).strict(); // Ensure no extra root properties
+    // Output config
+    output: z
+      .object({
+        directory: z.string().optional(),
+        filename: z.string().optional(),
+        format: z.enum(['md', 'html']).optional(),
+        includeTimestamp: z.boolean().optional(),
+      })
+      .strict()
+      .optional(), // Ensure correct property names
+  })
+  .strict(); // Ensure no extra root properties
 
 /**
  * Loads ignore patterns from a .perflensignore file in the specified directory
@@ -192,7 +223,8 @@ const configSchema = z.object({
 export function loadIgnorePatterns(cwd: string = process.cwd()): string[] {
   const ignoreFile = path.join(cwd, '.perflensignore');
   if (fs.existsSync(ignoreFile)) {
-    return fs.readFileSync(ignoreFile, 'utf-8')
+    return fs
+      .readFileSync(ignoreFile, 'utf-8')
       .split('\n')
       .map(line => line.trim())
       .filter(line => line && !line.startsWith('#'));
@@ -214,14 +246,14 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
       '.perflensrc.yaml',
       '.perflensrc.yml',
       '.perflensrc.js',
-      'perflens.config.js'
+      'perflens.config.js',
     ],
     loaders: {
       '.js': async (filepath: string) => {
         const result = await import(filepath);
         return result.default || result;
-      }
-    }
+      },
+    },
   });
 
   try {
@@ -243,10 +275,7 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
       actualConfig.analysis = actualConfig.analysis || {};
 
       // Merge ignore patterns into analysis.ignore
-      actualConfig.analysis.ignore = [
-        ...(actualConfig.analysis.ignore || []),
-        ...ignorePatterns
-      ];
+      actualConfig.analysis.ignore = [...(actualConfig.analysis.ignore || []), ...ignorePatterns];
     }
 
     // Merge with defaults
@@ -264,9 +293,9 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
         ...actualConfig.lighthouse,
         throttling: {
           ...DEFAULT_CONFIG.lighthouse?.throttling,
-          ...actualConfig.lighthouse?.throttling
-        }
-      }
+          ...actualConfig.lighthouse?.throttling,
+        },
+      },
     };
 
     try {
@@ -277,7 +306,9 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
       if (error instanceof z.ZodError) {
         console.error(chalk.red.bold('\nConfiguration validation failed:'));
         error.errors.forEach(err => {
-          console.error(chalk.red(`- ${err.path.join('.') || 'root'}: `) + chalk.yellow(err.message));
+          console.error(
+            chalk.red(`- ${err.path.join('.') || 'root'}: `) + chalk.yellow(err.message)
+          );
         });
         console.warn(chalk.yellow.bold('\n⚠️  Using default configuration instead.'));
         console.warn(chalk.yellow('To fix these errors:'));

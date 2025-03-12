@@ -5,8 +5,8 @@ import { AIModelConfig } from '../types/config.js';
 
 type generationOptions = {
   systemPrompt?: string;
-  onChunk?: (chunk: string, firstChunk?: boolean) => void
-}
+  onChunk?: (chunk: string, firstChunk?: boolean) => void;
+};
 
 export interface AIModel {
   generateSuggestions(prompt: string, options?: generationOptions): Promise<string>;
@@ -30,14 +30,18 @@ export class OpenAIModel implements AIModel {
       model: this.config.model,
       messages: [
         {
-          role: "system",
-          content: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
+          role: 'system',
+          content:
+            options?.systemPrompt ||
+            'You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.',
         },
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ],
-      ...(isReasoningModel ? { reasoning_effort: 'high' } : { temperature: this.config.temperature || 0.2 }),
+      ...(isReasoningModel
+        ? { reasoning_effort: 'high' }
+        : { temperature: this.config.temperature || 0.2 }),
       max_completion_tokens: this.config.maxTokens,
-      stream: true
+      stream: true,
     });
 
     let fullResponse = '';
@@ -71,11 +75,13 @@ export class AnthropicModel implements AIModel {
   async generateSuggestions(prompt: string, options?: generationOptions): Promise<string> {
     const stream = await this.client.messages.create({
       model: this.config.model,
-      system: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.",
+      system:
+        options?.systemPrompt ||
+        'You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.',
       messages: [{ role: 'user', content: prompt }],
       temperature: this.config.temperature || 0.2,
       max_tokens: this.config.maxTokens || 4096, // Anthropic's max tokens older models
-      stream: true
+      stream: true,
     });
 
     let fullResponse = '';
@@ -113,13 +119,13 @@ export class GeminiModel implements AIModel {
         temperature: this.config.temperature || 0.2,
         maxOutputTokens: this.config.maxTokens,
       },
-      systemInstruction: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
+      systemInstruction:
+        options?.systemPrompt ||
+        'You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.',
     });
 
     const result = await model.generateContentStream({
-      contents: [
-        {role: 'user', parts: [{text: prompt}]},
-      ],
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
 
     let fullResponse = '';

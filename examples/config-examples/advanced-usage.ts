@@ -9,14 +9,14 @@ async function main() {
     const envOverrides: Partial<PerflensConfig> = {
       analysis: {
         maxFiles: process.env.NODE_ENV === 'production' ? 1000 : 500,
-        targetDir: process.env.TARGET_DIR || './src'
+        targetDir: process.env.TARGET_DIR || './src',
       },
       lighthouse: {
         mobileEmulation: process.env.MOBILE === 'true',
         throttling: {
-          network: process.env.NETWORK_THROTTLE as '4G' | 'slow3G' | 'fast3G' || '4G'
-        }
-      }
+          network: (process.env.NETWORK_THROTTLE as '4G' | 'slow3G' | 'fast3G') || '4G',
+        },
+      },
     };
 
     // Merge configurations
@@ -24,12 +24,12 @@ async function main() {
       ...baseConfig,
       analysis: {
         ...baseConfig.analysis,
-        ...envOverrides.analysis
+        ...envOverrides.analysis,
       },
       lighthouse: {
         ...baseConfig.lighthouse,
-        ...envOverrides.lighthouse
-      }
+        ...envOverrides.lighthouse,
+      },
     };
 
     // Log final configuration
@@ -46,7 +46,6 @@ async function main() {
     if (finalConfig.lighthouse?.mobileEmulation) {
       console.log('\n⚠️ Mobile emulation is enabled');
     }
-
   } catch (error) {
     console.error('Error loading configuration:', error);
   }

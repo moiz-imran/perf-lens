@@ -20,13 +20,7 @@
     "filename": "react-app-performance",
     "includeTimestamp": true
   },
-  "ignore": [
-    "node_modules/**",
-    "dist/**",
-    "build/**",
-    "**/*.test.ts",
-    "**/*.test.tsx"
-  ],
+  "ignore": ["node_modules/**", "dist/**", "build/**", "**/*.test.ts", "**/*.test.tsx"],
   "bundleThresholds": {
     "maxInitialSize": 500000,
     "maxChunkSize": 244000

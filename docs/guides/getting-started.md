@@ -22,6 +22,7 @@ pnpm add -D perf-lens
 ```
 
 Add scripts to your `package.json`:
+
 ```json
 {
   "scripts": {
@@ -33,6 +34,7 @@ Add scripts to your `package.json`:
 ```
 
 2. Configure your AI provider:
+
 ```bash
 # Using environment variables
 export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
@@ -44,21 +46,25 @@ perf-lens config set-key YOUR_API_KEY --provider anthropic
 ## Basic Usage
 
 1. Navigate to your project:
+
 ```bash
 cd your-project
 ```
 
 2. Start your development server:
+
 ```bash
 npm run dev
 ```
 
 3. Run PerfLens:
+
 ```bash
 perf-lens scan
 ```
 
 PerfLens will:
+
 1. Detect your development server
 2. Run Lighthouse performance audits
 3. Analyze your codebase
@@ -80,12 +86,12 @@ export default {
   thresholds: {
     performance: 90,
     fcp: 2000,
-    lcp: 2500
+    lcp: 2500,
   },
   analysis: {
-    targetDir: 'src'
-  }
-}
+    targetDir: 'src',
+  },
+};
 ```
 
 See the [Configuration Reference](../configuration/README.md) for all options.
@@ -93,11 +99,13 @@ See the [Configuration Reference](../configuration/README.md) for all options.
 ## Generating Reports
 
 Generate a Markdown report:
+
 ```bash
 perf-lens scan --output report.md
 ```
 
 Generate an HTML report:
+
 ```bash
 perf-lens scan --output report.html --format html
 ```

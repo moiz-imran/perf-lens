@@ -1,9 +1,11 @@
 ## Description
+
 <!-- Please include a summary of the changes and which issue is fixed. -->
 
 Fixes # (issue)
 
 ## Type of change
+
 <!-- Please delete options that are not relevant. -->
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
@@ -12,6 +14,7 @@ Fixes # (issue)
 - [ ] Documentation update
 
 ## How Has This Been Tested?
+
 <!-- Please describe the tests that you ran to verify your changes. -->
 
 - [ ] Unit Tests

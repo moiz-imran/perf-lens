@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import type { PerflensConfig } from '../types';
 
 interface PerformanceReport {
   lighthouse: {
@@ -16,7 +17,7 @@ interface PerformanceReport {
   metadata: {
     timestamp: string;
     duration: number;
-    config: any;
+    config: PerflensConfig;
   };
 }
 
@@ -27,10 +28,14 @@ interface PerformanceReport {
  */
 export function generateMarkdownReport(data: PerformanceReport): string {
   return `# Performance Analysis Report
-${data.metadata ? `
+${
+  data.metadata
+    ? `
 Generated on: ${new Date(data.metadata.timestamp).toLocaleString()}
 Analysis Duration: ${Math.round(data.metadata.duration / 1000)}s
-` : ''}
+`
+    : ''
+}
 
 ## 🌟 Lighthouse Performance Report
 
@@ -48,19 +53,25 @@ ${data.lighthouse.analysis}
 ## 🧠 Code Analysis
 
 ### Critical Issues
-${data.codeAnalysis.critical.length > 0
-  ? data.codeAnalysis.critical.join('\n\n')
-  : '_No critical issues found_'}
+${
+  data.codeAnalysis.critical.length > 0
+    ? data.codeAnalysis.critical.join('\n\n')
+    : '_No critical issues found_'
+}
 
 ### Warnings
-${data.codeAnalysis.warnings.length > 0
-  ? data.codeAnalysis.warnings.join('\n\n')
-  : '_No warnings found_'}
+${
+  data.codeAnalysis.warnings.length > 0
+    ? data.codeAnalysis.warnings.join('\n\n')
+    : '_No warnings found_'
+}
 
 ### Suggestions
-${data.codeAnalysis.suggestions.length > 0
-  ? data.codeAnalysis.suggestions.join('\n\n')
-  : '_No suggestions found_'}
+${
+  data.codeAnalysis.suggestions.length > 0
+    ? data.codeAnalysis.suggestions.join('\n\n')
+    : '_No suggestions found_'
+}
 `;
 }
 
@@ -71,20 +82,19 @@ ${data.codeAnalysis.suggestions.length > 0
  */
 function formatMarkdownToHtml(text: string): string {
   // First, escape any existing HTML to prevent injection
-  text = text.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   // Store code blocks temporarily with a unique marker
   const codeBlocks: string[] = [];
   text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
     const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
     // Clean up the code block content
-    code = code.trim()
-              .replace(/<\/?p>/g, '') // Remove paragraph tags
-              .replace(/^\s{4}/gm, '') // Remove common leading indentation
-              .replace(/&lt;(\/?(?:em|strong|code|pre)>)/g, '<$1') // Restore intended HTML tags
-              .replace(/&amp;([lg]t;)/g, '&$1'); // Fix HTML entities
+    code = code
+      .trim()
+      .replace(/<\/?p>/g, '') // Remove paragraph tags
+      .replace(/^\s{4}/gm, '') // Remove common leading indentation
+      .replace(/&lt;(\/?(?:em|strong|code|pre)>)/g, '<$1') // Restore intended HTML tags
+      .replace(/&amp;([lg]t;)/g, '&$1'); // Fix HTML entities
 
     codeBlocks.push(`<pre><code class="language-${lang}">${code}</code></pre>`);
     return placeholder;
@@ -94,16 +104,19 @@ function formatMarkdownToHtml(text: string): string {
   const inlineCodeBlocks: string[] = [];
   text = text.replace(/`([^`]+)`/g, (match, code) => {
     const placeholder = `__INLINE_CODE_${inlineCodeBlocks.length}__`;
-    inlineCodeBlocks.push(`<code>${code.replace(/&lt;(\/?(?:em|strong|code|pre)>)/g, '<$1')}</code>`);
+    inlineCodeBlocks.push(
+      `<code>${code.replace(/&lt;(\/?(?:em|strong|code|pre)>)/g, '<$1')}</code>`
+    );
     return placeholder;
   });
 
   // Convert headers (ensuring proper hierarchy)
-  text = text.replace(/^# (.*$)/gm, '<h2>$1</h2>')
-            .replace(/^## (.*$)/gm, '<h3>$1</h3>')
-            .replace(/^### (.*$)/gm, '<h4>$1</h4>')
-            .replace(/^#### (.*$)/gm, '<h5>$1</h5>')
-            .replace(/^##### (.*$)/gm, '<h6>$1</h6>');
+  text = text
+    .replace(/^# (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^## (.*$)/gm, '<h3>$1</h3>')
+    .replace(/^### (.*$)/gm, '<h4>$1</h4>')
+    .replace(/^#### (.*$)/gm, '<h5>$1</h5>')
+    .replace(/^##### (.*$)/gm, '<h6>$1</h6>');
 
   // Convert bold text
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -118,7 +131,7 @@ function formatMarkdownToHtml(text: string): string {
     const listStack: { type: string; level: number }[] = [];
     let currentListType: string | null = null;
 
-    lines.forEach((line) => {
+    lines.forEach(line => {
       const trimmedLine = line.trimStart();
       const indentLevel = Math.floor((line.length - trimmedLine.length) / 2);
 
@@ -137,7 +150,10 @@ function formatMarkdownToHtml(text: string): string {
           listStack.push({ type: listType, level: indentLevel });
         }
         // If we're changing list types at the same level
-        else if (currentListType !== listType && listStack[listStack.length - 1]?.level === indentLevel) {
+        else if (
+          currentListType !== listType &&
+          listStack[listStack.length - 1]?.level === indentLevel
+        ) {
           while (listStack.length > 0 && listStack[listStack.length - 1].level >= indentLevel) {
             const last = listStack.pop()!;
             output.push(`</li>\n</${last.type}>`);
@@ -192,15 +208,20 @@ function formatMarkdownToHtml(text: string): string {
   text = processLists(text);
 
   // Convert paragraphs (lines with content)
-  text = text.split('\n').map(line => {
-    if (line.trim() &&
+  text = text
+    .split('\n')
+    .map(line => {
+      if (
+        line.trim() &&
         !line.match(/^<(div|pre|p|h[1-6]|ul|ol|li)[^>]*>/i) && // Only exclude block-level elements
         !line.includes('__CODE_BLOCK_') &&
-        !line.includes('__INLINE_CODE_')) {
-      return `<p>${line}</p>`;
-    }
-    return line;
-  }).join('\n');
+        !line.includes('__INLINE_CODE_')
+      ) {
+        return `<p>${line}</p>`;
+      }
+      return line;
+    })
+    .join('\n');
 
   // Restore code blocks
   codeBlocks.forEach((block, i) => {
@@ -579,11 +600,15 @@ export function generateHtmlReport(data: PerformanceReport): string {
   <div class="container">
     <div class="header">
       <h1>🔍 Performance Analysis Report</h1>
-      ${data.metadata ? `
+      ${
+        data.metadata
+          ? `
       <div class="metadata">
         <p>Generated on: ${new Date(data.metadata.timestamp).toLocaleString()}</p>
         <p>Analysis Duration: ${Math.round(data.metadata.duration / 1000)}s</p>
-      </div>` : ''}
+      </div>`
+          : ''
+      }
     </div>
 
     <div class="summary">
@@ -604,17 +629,20 @@ export function generateHtmlReport(data: PerformanceReport): string {
     <h2>🌟 Lighthouse Performance Report</h2>
 
     <div class="metrics">
-      ${data.lighthouse.metrics.split('\n').map(line => {
-        if (!line.trim()) return '';
-        const [title, value] = line.split(':').map(s => s.trim());
-        if (!title || !value) return '';
-        return `
+      ${data.lighthouse.metrics
+        .split('\n')
+        .map(line => {
+          if (!line.trim()) return '';
+          const [title, value] = line.split(':').map(s => s.trim());
+          if (!title || !value) return '';
+          return `
           <div class="metric-card">
             <div class="metric-title">${title}</div>
             <div class="metric-value">${formatMetricValue(value)}</div>
           </div>
         `;
-      }).join('')}
+        })
+        .join('')}
     </div>
 
     <div class="card">
@@ -629,32 +657,56 @@ export function generateHtmlReport(data: PerformanceReport): string {
 
     <h2>🧠 Code Analysis</h2>
 
-    ${data.codeAnalysis.critical.length > 0 ? `
+    ${
+      data.codeAnalysis.critical.length > 0
+        ? `
       <h3>Critical Issues</h3>
-      ${data.codeAnalysis.critical.map(issue => `
+      ${data.codeAnalysis.critical
+        .map(
+          issue => `
         <div class="issue critical">
           ${formatIssue(issue)}
         </div>
-      `).join('\n')}
-    ` : ''}
+      `
+        )
+        .join('\n')}
+    `
+        : ''
+    }
 
-    ${data.codeAnalysis.warnings.length > 0 ? `
+    ${
+      data.codeAnalysis.warnings.length > 0
+        ? `
       <h3>Warnings</h3>
-      ${data.codeAnalysis.warnings.map(issue => `
+      ${data.codeAnalysis.warnings
+        .map(
+          issue => `
         <div class="issue warning">
           ${formatIssue(issue)}
         </div>
-      `).join('\n')}
-    ` : ''}
+      `
+        )
+        .join('\n')}
+    `
+        : ''
+    }
 
-    ${data.codeAnalysis.suggestions.length > 0 ? `
+    ${
+      data.codeAnalysis.suggestions.length > 0
+        ? `
       <h3>Suggestions</h3>
-      ${data.codeAnalysis.suggestions.map(issue => `
+      ${data.codeAnalysis.suggestions
+        .map(
+          issue => `
         <div class="issue suggestion">
           ${formatIssue(issue)}
         </div>
-      `).join('\n')}
-    ` : ''}
+      `
+        )
+        .join('\n')}
+    `
+        : ''
+    }
   </div>
 </body>
 </html>`;
@@ -674,7 +726,7 @@ function formatIssue(issue: string): string {
 
   if (!match) return issue;
 
-  const [_, path, lines] = match;
+  const [, path, lines] = match;
   const restOfIssue = parts.slice(1).join('\n');
 
   return `
@@ -693,7 +745,11 @@ function formatIssue(issue: string): string {
  * @param {string} [outputPath] - Optional path to save the report
  * @returns {string} The path where the report was saved
  */
-export function saveReport(data: PerformanceReport, format: 'md' | 'html' = 'md', outputPath?: string): string {
+export function saveReport(
+  data: PerformanceReport,
+  format: 'md' | 'html' = 'html',
+  outputPath?: string
+): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const defaultFileName = `performance-report-${timestamp}`;
   const filePath = outputPath || path.join(process.cwd(), defaultFileName + '.' + format);
@@ -704,9 +760,7 @@ export function saveReport(data: PerformanceReport, format: 'md' | 'html' = 'md'
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const content = format === 'md'
-    ? generateMarkdownReport(data)
-    : generateHtmlReport(data);
+  const content = format === 'md' ? generateMarkdownReport(data) : generateHtmlReport(data);
 
   try {
     fs.writeFileSync(filePath, content);

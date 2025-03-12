@@ -23,16 +23,19 @@ with-react/
 ## Getting Started
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
 
 2. Start the development server:
+
    ```bash
    npm start
    ```
 
 3. Run performance analysis:
+
    ```bash
    # Development analysis
    npm run analyze:perf
@@ -44,6 +47,7 @@ with-react/
 ## Configuration
 
 The `perflens.config.json` file includes:
+
 - Analysis settings for React components
 - Lighthouse configuration for performance metrics
 - Bundle size thresholds
@@ -52,6 +56,7 @@ The `perflens.config.json` file includes:
 ## Performance Considerations
 
 The example includes:
+
 - A large list component that could impact performance
 - Loading state management
 - CSS transitions that could affect layout stability
@@ -60,6 +65,7 @@ The example includes:
 ## Analysis Results
 
 After running the analysis, you'll get:
+
 - Lighthouse performance metrics
 - Bundle size analysis
 - Code-level performance suggestions

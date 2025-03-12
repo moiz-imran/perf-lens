@@ -12,12 +12,12 @@ const lhResults = await runLighthouse({
   port: 3000,
   bundleThresholds: {
     maxInitialSize: '250kb',
-    maxChunkSize: '50kb'
+    maxChunkSize: '50kb',
   },
   performanceThresholds: {
     fcp: 2000,
-    lcp: 2500
-  }
+    lcp: 2500,
+  },
 });
 
 // Analyze codebase
@@ -26,8 +26,8 @@ const analysisResults = await analyzeCodebase({
   maxFiles: 200,
   lighthouseContext: {
     metrics: lhResults.metrics,
-    analysis: lhResults.analysis
-  }
+    analysis: lhResults.analysis,
+  },
 });
 
 console.log('Performance Score:', lhResults.metrics);

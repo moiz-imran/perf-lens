@@ -12,7 +12,7 @@ export type NetworkThrottle = 'slow3G' | 'fast3G' | '4G' | 'none';
  * Global configuration
  */
 export interface GlobalConfig {
-  verbose?: boolean;  // Global verbose flag for all operations
+  verbose?: boolean; // Global verbose flag for all operations
 }
 
 /**

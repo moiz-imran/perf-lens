@@ -8,7 +8,7 @@ export default {
     totalBlockingTime: 200, // Maximum TBT in milliseconds
     cumulativeLayoutShift: 0.1, // Maximum CLS score
     speedIndex: 3000, // Maximum Speed Index in milliseconds
-    timeToInteractive: 3800 // Maximum TTI in milliseconds
+    timeToInteractive: 3800, // Maximum TTI in milliseconds
   },
 
   // Bundle size thresholds
@@ -17,7 +17,7 @@ export default {
     maxChunkSize: '50kb', // Maximum chunk size
     maxAssetSize: '100kb', // Maximum size for any asset
     maxImageSize: '100kb', // Maximum size for images
-    maxFontSize: '50kb' // Maximum size for font files
+    maxFontSize: '50kb', // Maximum size for font files
   },
 
   // Analysis configuration
@@ -27,7 +27,8 @@ export default {
     maxFileSize: 102400, // Maximum file size in bytes (100KB)
     batchDelay: 1000, // Delay between batches in milliseconds
     targetDir: 'src', // Directory to scan (relative to project root)
-    include: [ // File patterns to include (defaults to common frontend file types)
+    include: [
+      // File patterns to include (defaults to common frontend file types)
       '**/*.js',
       '**/*.jsx',
       '**/*.ts',
@@ -39,9 +40,10 @@ export default {
       '**/*.scss',
       '**/*.less',
       '**/*.sass',
-      '**/*.html'
+      '**/*.html',
     ],
-    ignore: [ // Patterns to ignore (in addition to .perflensignore)
+    ignore: [
+      // Patterns to ignore (in addition to .perflensignore)
       // Build and dependency directories
       '**/node_modules/**',
       '**/dist/**',
@@ -93,7 +95,7 @@ export default {
       '**/.temp/**',
       '**/.tmp/**',
       '**/tmp/**',
-      '**/temp/**'
+      '**/temp/**',
     ],
   },
 
@@ -101,18 +103,18 @@ export default {
   rules: {
     'no-render-blocking-resources': {
       severity: 'error',
-      threshold: 500 // Maximum blocking time in ms
+      threshold: 500, // Maximum blocking time in ms
     },
     'optimize-images': {
       severity: 'warning',
       options: {
         webp: true, // Convert images to WebP
-        lazy: true // Use lazy loading
-      }
+        lazy: true, // Use lazy loading
+      },
     },
     'minify-javascript': {
-      severity: 'error'
-    }
+      severity: 'error',
+    },
   },
 
   // Output configuration
@@ -120,7 +122,7 @@ export default {
     format: 'html', // 'md' or 'html'
     directory: './reports', // Output directory
     filename: 'performance-report', // Base filename (without extension)
-    includeTimestamp: true // Add timestamp to filename
+    includeTimestamp: true, // Add timestamp to filename
   },
 
   // Lighthouse configuration
@@ -129,7 +131,7 @@ export default {
     mobileEmulation: true, // Use mobile emulation
     throttling: {
       cpu: 4, // CPU slowdown multiplier
-      network: 'fast3G' // Network throttling preset
-    }
-  }
+      network: 'fast3G', // Network throttling preset
+    },
+  },
 };

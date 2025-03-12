@@ -11,8 +11,8 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const DEFAULT_MODELS = {
   openai: 'o3-mini',
   anthropic: 'claude-3-5-haiku-20241022',
-  gemini: 'gemini-1.5-pro'
-}
+  gemini: 'gemini-1.5-pro',
+};
 
 interface Config {
   openaiApiKey?: string;
@@ -116,14 +116,14 @@ export function createModel(config: AIModelConfig): AIModel {
   if (!apiKey) {
     throw new Error(
       `API key not found for ${config.provider}! Please set it using:\n` +
-      `perf-lens config set-key YOUR_API_KEY --provider ${config.provider}\n` +
-      `Or set the ${config.provider.toUpperCase()}_API_KEY environment variable.`
+        `perf-lens config set-key YOUR_API_KEY --provider ${config.provider}\n` +
+        `Or set the ${config.provider.toUpperCase()}_API_KEY environment variable.`
     );
   }
 
   return createAIModel({
     ...config,
-    apiKey
+    apiKey,
   });
 }
 
@@ -138,7 +138,7 @@ export async function validateApiKey(key: string, provider: AIProvider): Promise
     const model = createModel({
       provider,
       model: DEFAULT_MODELS[provider],
-      apiKey: key
+      apiKey: key,
     });
 
     // Test the API key with a simple prompt

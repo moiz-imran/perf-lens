@@ -1,4 +1,4 @@
-import lighthouse, { type Result, Flags } from "lighthouse";
+import lighthouse, { type Result, Flags } from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import axios from 'axios';
 import chalk from 'chalk';
@@ -6,8 +6,14 @@ import fs from 'fs';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { createModel } from './ai.js';
-import type { LighthouseConfig, BundleThresholds, PerformanceThresholds, AIModelConfig, GlobalConfig } from '../types/config.js';
-import { AIModel } from "../ai/models.js";
+import type {
+  LighthouseConfig,
+  BundleThresholds,
+  PerformanceThresholds,
+  AIModelConfig,
+  GlobalConfig,
+} from '../types/config.js';
+import { AIModel } from '../ai/models.js';
 
 // Add type definitions for Lighthouse audit details
 interface AuditItem {
@@ -21,7 +27,6 @@ interface AuditItem {
 interface AuditDetails {
   type: string;
   items?: AuditItem[];
-  [key: string]: any;
 }
 
 interface LighthouseAudit {
@@ -29,9 +34,9 @@ interface LighthouseAudit {
   title: string;
   description: string;
   score: number | null;
+  numericValue: string;
   displayValue?: string;
   details?: AuditDetails;
-  [key: string]: any;
 }
 
 const COMMON_DEV_PORTS = [3000, 5173, 8080, 4321, 4000];
@@ -46,19 +51,19 @@ async function findPortInPackageJson(): Promise<number | null> {
     const scripts = packageJson.scripts || {};
 
     // Look for port in dev/start scripts
-    const devScripts = Object.values(scripts).filter((script): script is string =>
-      typeof script === 'string' &&
-      (script.includes('dev') || script.includes('start'))
+    const devScripts = Object.values(scripts).filter(
+      (script): script is string =>
+        typeof script === 'string' && (script.includes('dev') || script.includes('start'))
     );
 
     for (const script of devScripts) {
-      const portMatch = script.match(/--port\s+(\d+)/) ||
-                       script.match(/-p\s+(\d+)/) ||
-                       script.match(/PORT=(\d+)/);
+      const portMatch =
+        script.match(/--port\s+(\d+)/) || script.match(/-p\s+(\d+)/) || script.match(/PORT=(\d+)/);
       if (portMatch) {
         return parseInt(portMatch[1], 10);
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     // Ignore errors if package.json doesn't exist or is invalid
   }
@@ -117,8 +122,8 @@ async function findDevServer(): Promise<number | null> {
       type: 'confirm',
       name: 'shouldPrompt',
       message: 'Would you like to specify a custom port?',
-      default: true
-    }
+      default: true,
+    },
   ]);
 
   if (!shouldPrompt) {
@@ -130,14 +135,14 @@ async function findDevServer(): Promise<number | null> {
       type: 'input',
       name: 'port',
       message: 'Enter your development server port:',
-      validate: (input) => {
+      validate: input => {
         const port = parseInt(input, 10);
         if (isNaN(port) || port < 1 || port > 65535) {
           return 'Please enter a valid port number (1-65535)';
         }
         return true;
-      }
-    }
+      },
+    },
   ]);
 
   const userPort = parseInt(port, 10);
@@ -159,8 +164,12 @@ async function findDevServer(): Promise<number | null> {
  * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @returns {string} Formatted report string
  */
-function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds): string {
-  const metrics = report.audits as Record<string, LighthouseAudit>;
+function formatLighthouseReport(
+  report: Result,
+  bundleThresholds?: BundleThresholds,
+  performanceThresholds?: PerformanceThresholds
+): string {
+  const metrics = report.audits as unknown as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
 
   let output = `# Performance Score: ${score.toFixed(0)}%\n`;
@@ -243,18 +252,24 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
       .filter(item => item.resourceType === 'Script')
       .map(item => ({
         url: item.url || '',
-        size: item.transferSize || 0
+        size: item.transferSize || 0,
       }));
 
     // Calculate asset sizes by type
-    const assetSizes = requests.reduce((acc, item) => {
-      if (item.resourceType === 'Image' && item.url) {
-        acc.images.push({ url: item.url, size: item.transferSize || 0 });
-      } else if (item.resourceType === 'Font' && item.url) {
-        acc.fonts.push({ url: item.url, size: item.transferSize || 0 });
+    const assetSizes = requests.reduce(
+      (acc, item) => {
+        if (item.resourceType === 'Image' && item.url) {
+          acc.images.push({ url: item.url, size: item.transferSize || 0 });
+        } else if (item.resourceType === 'Font' && item.url) {
+          acc.fonts.push({ url: item.url, size: item.transferSize || 0 });
+        }
+        return acc;
+      },
+      { images: [], fonts: [] } as {
+        images: Array<{ url: string; size: number }>;
+        fonts: Array<{ url: string; size: number }>;
       }
-      return acc;
-    }, { images: [], fonts: [] } as { images: Array<{url: string, size: number}>, fonts: Array<{url: string, size: number}> });
+    );
 
     // Check against thresholds
     if (bundleThresholds) {
@@ -279,7 +294,8 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
       // Check total size
       const maxTotalKb = parseSizeString(bundleThresholds.maxTotalSize || '0kb');
       if (maxTotalKb > 0) {
-        const totalSizeKb = requests.reduce((acc, item) => acc + (item.transferSize || 0), 0) / 1024;
+        const totalSizeKb =
+          requests.reduce((acc, item) => acc + (item.transferSize || 0), 0) / 1024;
         if (totalSizeKb > maxTotalKb) {
           output += `\n⚠️ Total transfer size (${totalSizeKb.toFixed(1)}KB) exceeds threshold (${maxTotalKb}KB)\n`;
         }
@@ -288,7 +304,9 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
       // Check async chunks
       const maxAsyncChunks = bundleThresholds.maxAsyncChunks || 0;
       if (maxAsyncChunks > 0) {
-        const asyncChunks = jsChunks.filter(chunk => chunk.url.includes('chunk') || chunk.url.includes('async'));
+        const asyncChunks = jsChunks.filter(
+          chunk => chunk.url.includes('chunk') || chunk.url.includes('async')
+        );
         if (asyncChunks.length > maxAsyncChunks) {
           output += `\n⚠️ Number of async chunks (${asyncChunks.length}) exceeds threshold (${maxAsyncChunks})\n`;
         }
@@ -358,7 +376,10 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
   const networkRequests = metrics['network-requests']?.details?.items || [];
   if (networkRequests.length > 0) {
     output += '## Network Analysis\n';
-    const totalBytes = networkRequests.reduce((acc: number, item: AuditItem) => acc + (item.transferSize || 0), 0);
+    const totalBytes = networkRequests.reduce(
+      (acc: number, item: AuditItem) => acc + (item.transferSize || 0),
+      0
+    );
     output += `Total Transfer Size: ${(totalBytes / 1024).toFixed(2)}KB\n\n`;
 
     // Group by resource type
@@ -385,8 +406,11 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
  * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @returns {string} Formatted console output string
  */
-function formatConsoleOutput(report: Result, performanceThresholds?: PerformanceThresholds): string {
-  const metrics = report.audits as Record<string, LighthouseAudit>;
+function formatConsoleOutput(
+  report: Result,
+  performanceThresholds?: PerformanceThresholds
+): string {
+  const metrics = report.audits as unknown as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
 
   let output = `Performance Score: ${score.toFixed(0)}%`;
@@ -509,7 +533,10 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
   const networkRequests = metrics['network-requests']?.details?.items || [];
   if (networkRequests.length > 0) {
     output += chalk.yellow.bold('Network Analysis:\n');
-    const totalBytes = networkRequests.reduce((acc: number, item: AuditItem) => acc + (item.transferSize || 0), 0);
+    const totalBytes = networkRequests.reduce(
+      (acc: number, item: AuditItem) => acc + (item.transferSize || 0),
+      0
+    );
     output += `Total Transfer Size: ${(totalBytes / 1024).toFixed(2)}KB\n`;
 
     // Group by resource type
@@ -537,7 +564,11 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
  * @param {boolean} [verbose] - Whether to enable verbose output
  * @returns {Promise<string>} AI-generated analysis of the report
  */
-async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?: boolean): Promise<string> {
+async function analyzeLighthouseReport(
+  report: Result,
+  model: AIModel,
+  verbose?: boolean
+): Promise<string> {
   const spinner = ora('Analyzing Lighthouse results...').start();
 
   // Split analysis into focused sections
@@ -550,8 +581,8 @@ async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?:
         'total-blocking-time': report.audits['total-blocking-time'],
         'cumulative-layout-shift': report.audits['cumulative-layout-shift'],
         'speed-index': report.audits['speed-index'],
-        'interactive': report.audits['interactive']
-      }
+        interactive: report.audits['interactive'],
+      },
     },
     {
       name: 'Performance Opportunities',
@@ -562,8 +593,8 @@ async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?:
         'offscreen-images': report.audits['offscreen-images'],
         'unminified-javascript': report.audits['unminified-javascript'],
         'unminified-css': report.audits['unminified-css'],
-        'modern-image-formats': report.audits['modern-image-formats']
-      }
+        'modern-image-formats': report.audits['modern-image-formats'],
+      },
     },
     {
       name: 'Diagnostics',
@@ -573,12 +604,12 @@ async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?:
         'critical-request-chains': report.audits['critical-request-chains'],
         'network-requests': report.audits['network-requests'],
         'network-rtt': report.audits['network-rtt'],
-        'network-server-latency': report.audits['network-server-latency']
-      }
-    }
+        'network-server-latency': report.audits['network-server-latency'],
+      },
+    },
   ];
 
-  let analysisResults = [];
+  const analysisResults = [];
 
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
@@ -672,29 +703,33 @@ Implement server-side caching and optimize database queries.
 - 35% improvement in initial render time`;
 
     try {
-      const systemPrompt = "You are a performance optimization expert specializing in Lighthouse performance analysis. Focus on providing actionable insights based on the data provided.";
-      const response = await model.generateSuggestions(prompt, { systemPrompt, onChunk: (chunk, firstChunk) => {
-        if (verbose) {
-          if (firstChunk) {
-            spinner.stop();
-            console.log(`\n# ${section.name}\n\n`);
+      const systemPrompt =
+        'You are a performance optimization expert specializing in Lighthouse performance analysis. Focus on providing actionable insights based on the data provided.';
+      const response = await model.generateSuggestions(prompt, {
+        systemPrompt,
+        onChunk: (chunk, firstChunk) => {
+          if (verbose) {
+            if (firstChunk) {
+              spinner.stop();
+              console.log(`\n# ${section.name}\n\n`);
+            }
+            process.stdout.write(chunk);
           }
-          process.stdout.write(chunk);
-        }
-      }});
+        },
+      });
 
       if (!response || response.trim() === '') {
         console.error(`Warning: Empty response received for ${section.name}`);
         analysisResults.push({
           section: section.name,
-          analysis: `No analysis available for ${section.name}. Please check the raw Lighthouse report for details.`
+          analysis: `No analysis available for ${section.name}. Please check the raw Lighthouse report for details.`,
         });
         continue;
       }
 
       analysisResults.push({
         section: section.name,
-        analysis: response
+        analysis: response,
       });
     } catch (error) {
       console.error(`Error analyzing ${section.name}:`, error);
@@ -702,12 +737,12 @@ Implement server-side caching and optimize database queries.
         console.error('Error details:', {
           name: error.name,
           message: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       }
       analysisResults.push({
         section: section.name,
-        analysis: `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`
+        analysis: `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`,
       });
     }
 
@@ -718,7 +753,9 @@ Implement server-side caching and optimize database queries.
   spinner.succeed('Lighthouse analysis complete');
 
   // Return the section analyses
-  return analysisResults.map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`).join('\n\n');
+  return analysisResults
+    .map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`)
+    .join('\n\n');
 }
 
 /**
@@ -752,10 +789,10 @@ function parseSizeString(size: string): number {
  */
 export async function runLighthouse(
   config?: LighthouseConfig & {
-    bundleThresholds?: BundleThresholds,
-    performanceThresholds?: PerformanceThresholds,
-    ai?: AIModelConfig
-  } & GlobalConfig,
+    bundleThresholds?: BundleThresholds;
+    performanceThresholds?: PerformanceThresholds;
+    ai?: AIModelConfig;
+  } & GlobalConfig
 ): Promise<{
   metrics: string;
   report: string;
@@ -763,19 +800,19 @@ export async function runLighthouse(
   fullReport: Result;
 }> {
   // Check for running dev server
-  const port = config?.port || await findDevServer();
+  const port = config?.port || (await findDevServer());
   if (!port) {
     throw new Error(
       chalk.red('\nNo development server detected!') +
-      '\nPlease ensure your development server is running.' +
-      '\nTypical commands to start a dev server:' +
-      '\n- npm run dev' +
-      '\n- yarn dev' +
-      '\n- pnpm dev'
+        '\nPlease ensure your development server is running.' +
+        '\nTypical commands to start a dev server:' +
+        '\n- npm run dev' +
+        '\n- yarn dev' +
+        '\n- pnpm dev'
     );
   }
 
-  const chrome = await chromeLauncher.launch({chromeFlags: ['--headless']});
+  const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
   let retryCount = 0;
   const maxRetries = config?.retries || 3;
   const timeout = config?.timeout || 30000; // 30 seconds default timeout
@@ -785,49 +822,57 @@ export async function runLighthouse(
     output: 'json' as const,
     onlyCategories: ['performance'],
     port: chrome.port,
-    formFactor: config?.mobileEmulation ? 'mobile' : 'desktop' as const,
-    screenEmulation: config?.mobileEmulation ? {
-      mobile: true,
-      width: 375,
-      height: 667,
-      deviceScaleFactor: 2,
-      disabled: false,
-    } : {
-      mobile: false,
-      width: 1350,
-      height: 940,
-      deviceScaleFactor: 1,
-      disabled: false,
-    },
+    formFactor: config?.mobileEmulation ? 'mobile' : ('desktop' as const),
+    screenEmulation: config?.mobileEmulation
+      ? {
+          mobile: true,
+          width: 375,
+          height: 667,
+          deviceScaleFactor: 2,
+          disabled: false,
+        }
+      : {
+          mobile: false,
+          width: 1350,
+          height: 940,
+          deviceScaleFactor: 1,
+          disabled: false,
+        },
     throttling: {
       cpuSlowdownMultiplier: config?.throttling?.cpu || 4,
       // Network throttling presets
-      ...(config?.throttling?.network === 'slow3G' ? {
-        rttMs: 150,
-        throughputKbps: 1638.4,
-        requestLatencyMs: 562.5,
-        downloadThroughputKbps: 1474.5600000000002,
-        uploadThroughputKbps: 675,
-      } : config?.throttling?.network === 'fast3G' ? {
-        rttMs: 40,
-        throughputKbps: 10240,
-        requestLatencyMs: 150,
-        downloadThroughputKbps: 9216,
-        uploadThroughputKbps: 3075,
-      } : config?.throttling?.network === '4G' ? {
-        rttMs: 20,
-        throughputKbps: 20480,
-        requestLatencyMs: 75,
-        downloadThroughputKbps: 18432,
-        uploadThroughputKbps: 6144,
-      } : {
-        rttMs: 0,
-        throughputKbps: 0,
-        requestLatencyMs: 0,
-        downloadThroughputKbps: 0,
-        uploadThroughputKbps: 0,
-      })
-    }
+      ...(config?.throttling?.network === 'slow3G'
+        ? {
+            rttMs: 150,
+            throughputKbps: 1638.4,
+            requestLatencyMs: 562.5,
+            downloadThroughputKbps: 1474.5600000000002,
+            uploadThroughputKbps: 675,
+          }
+        : config?.throttling?.network === 'fast3G'
+          ? {
+              rttMs: 40,
+              throughputKbps: 10240,
+              requestLatencyMs: 150,
+              downloadThroughputKbps: 9216,
+              uploadThroughputKbps: 3075,
+            }
+          : config?.throttling?.network === '4G'
+            ? {
+                rttMs: 20,
+                throughputKbps: 20480,
+                requestLatencyMs: 75,
+                downloadThroughputKbps: 18432,
+                uploadThroughputKbps: 6144,
+              }
+            : {
+                rttMs: 0,
+                throughputKbps: 0,
+                requestLatencyMs: 0,
+                downloadThroughputKbps: 0,
+                uploadThroughputKbps: 0,
+              }),
+    },
   };
 
   const model = createModel(config?.ai || { provider: 'openai', model: 'o3-mini' });
@@ -835,17 +880,21 @@ export async function runLighthouse(
   while (retryCount < maxRetries) {
     try {
       if (config?.verbose) {
-        console.log(chalk.blue(`\nRunning Lighthouse on http://localhost:${port} (Attempt ${retryCount + 1}/${maxRetries})`));
+        console.log(
+          chalk.blue(
+            `\nRunning Lighthouse on http://localhost:${port} (Attempt ${retryCount + 1}/${maxRetries})`
+          )
+        );
       }
 
       const spinner = ora('Running Lighthouse audit...').start();
 
-      const runnerResult = await Promise.race([
+      const runnerResult = (await Promise.race([
         lighthouse(`http://localhost:${port}`, options),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Lighthouse analysis timed out')), timeout)
-        )
-      ]) as { lhr: Result };
+        ),
+      ])) as { lhr: Result };
 
       if (!runnerResult?.lhr) {
         spinner.fail('Lighthouse audit failed');
@@ -856,7 +905,11 @@ export async function runLighthouse(
       spinner.succeed('Lighthouse audit complete');
       chrome.kill();
 
-      const formattedReport = formatLighthouseReport(report, config?.bundleThresholds, config?.performanceThresholds);
+      const formattedReport = formatLighthouseReport(
+        report,
+        config?.bundleThresholds,
+        config?.performanceThresholds
+      );
 
       if (config?.verbose) {
         // Print metrics to console
@@ -868,16 +921,17 @@ export async function runLighthouse(
       const score = (report.categories.performance?.score || 0) * 100;
       const metrics = report.audits;
 
-      const metricsString = `Performance Score: ${score.toFixed(0)}%\n` +
-             `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n` +
-             `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n` +
-             `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
+      const metricsString =
+        `Performance Score: ${score.toFixed(0)}%\n` +
+        `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}\n` +
+        `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}\n` +
+        `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
 
       return {
         metrics: metricsString,
         report: formattedReport,
         analysis: analysis,
-        fullReport: report
+        fullReport: report,
       };
     } catch (error) {
       retryCount++;

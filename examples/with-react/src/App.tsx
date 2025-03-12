@@ -5,7 +5,7 @@ import './App.css';
 const LargeList = ({ items }: { items: number[] }) => {
   return (
     <div className="large-list">
-      {items.map((item) => (
+      {items.map(item => (
         <div key={item} className="list-item">
           Item {item}
         </div>
@@ -33,11 +33,7 @@ function App() {
   return (
     <div className="app">
       <h1>React Performance Example</h1>
-      {isLoading ? (
-        <div className="loading">Loading...</div>
-      ) : (
-        <LargeList items={items} />
-      )}
+      {isLoading ? <div className="loading">Loading...</div> : <LargeList items={items} />}
     </div>
   );
 }

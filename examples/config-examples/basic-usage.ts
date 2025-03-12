@@ -17,14 +17,13 @@ async function main() {
       analysis: {
         ...config.analysis,
         maxFiles: 1000,
-        targetDir: './src'
-      }
+        targetDir: './src',
+      },
     };
 
     console.log('\nCustomized Settings:');
     console.log(`- Max files: ${customConfig.analysis?.maxFiles}`);
     console.log(`- Target directory: ${customConfig.analysis?.targetDir}`);
-
   } catch (error) {
     console.error('Error loading configuration:', error);
   }

@@ -16,6 +16,7 @@ A powerful performance analysis tool for web applications that combines Lighthou
 ## Features
 
 ### 🌟 Lighthouse Performance Analysis
+
 - Core Web Vitals measurement and scoring
 - Performance bottleneck detection
 - Resource usage analysis:
@@ -25,6 +26,7 @@ A powerful performance analysis tool for web applications that combines Lighthou
   - Resource loading optimization
 
 ### 🧠 AI-Powered Code Analysis
+
 - Framework-aware code scanning
 - Performance pattern detection
 - Batch processing of files with:
@@ -33,6 +35,7 @@ A powerful performance analysis tool for web applications that combines Lighthou
   - Framework-specific analysis
 
 ### 📊 Rich Reporting
+
 - Detailed HTML reports with:
   - Performance metrics dashboard
   - Critical issues highlighting
@@ -54,6 +57,7 @@ pnpm add -D perf-lens
 ```
 
 Add scripts to your `package.json`:
+
 ```json
 {
   "scripts": {
@@ -65,6 +69,7 @@ Add scripts to your `package.json`:
 ```
 
 Now you can run PerfLens using:
+
 ```bash
 npm run analyze
 ```
@@ -82,6 +87,7 @@ perf-lens scan
 ## Quick Start
 
 1. Configure your AI provider:
+
 ```bash
 # Using environment variables
 export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
@@ -91,11 +97,13 @@ perf-lens config set-key YOUR_API_KEY --provider anthropic
 ```
 
 2. Run PerfLens:
+
 ```bash
 perf-lens scan
 ```
 
 The tool will automatically:
+
 - Detect your development server
 - Run performance audits
 - Analyze your codebase
@@ -116,7 +124,7 @@ export default {
     tbt: 200,
     cls: 0.1,
     speedIndex: 3000,
-    tti: 3800
+    tti: 3800,
   },
 
   // Bundle size thresholds
@@ -124,7 +132,7 @@ export default {
     maxInitialSize: '250kb',
     maxChunkSize: '50kb',
     maxAsyncChunks: 5,
-    maxTotalSize: '1mb'
+    maxTotalSize: '1mb',
   },
 
   // Analysis configuration
@@ -134,7 +142,8 @@ export default {
     batchSize: 20,
     maxFileSize: 102400, // 100KB
     batchDelay: 1000,
-    include: [ // File patterns to include
+    include: [
+      // File patterns to include
       '**/*.js',
       '**/*.jsx',
       '**/*.ts',
@@ -146,13 +155,14 @@ export default {
       '**/*.scss',
       '**/*.less',
       '**/*.sass',
-      '**/*.html'
+      '**/*.html',
     ],
-    ignore: [ // Patterns to ignore (in addition to .perflensignore)
+    ignore: [
+      // Patterns to ignore (in addition to .perflensignore)
       '**/node_modules/**',
       '**/dist/**',
-      '**/build/**'
-    ]
+      '**/build/**',
+    ],
   },
 
   // Lighthouse configuration
@@ -161,8 +171,8 @@ export default {
     mobileEmulation: true,
     throttling: {
       cpu: 4,
-      network: 'fast3G'
-    }
+      network: 'fast3G',
+    },
   },
 
   // Output configuration
@@ -170,7 +180,7 @@ export default {
     format: 'html',
     directory: './reports',
     filename: 'performance-report',
-    includeTimestamp: true
+    includeTimestamp: true,
   },
 
   // AI configuration
@@ -178,8 +188,8 @@ export default {
     provider: 'anthropic',
     model: 'claude-3-5-haiku-20241022',
     maxTokens: 8192,
-    temperature: 0.2
-  }
+    temperature: 0.2,
+  },
 };
 ```
 
@@ -191,20 +201,20 @@ See [Configuration Reference](docs/configuration/README.md) for all options.
 perf-lens scan [options]
 ```
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-c, --config` | Path to config file | - |
-| `-p, --port` | Development server port | auto-detect |
-| `-t, --target` | Target directory to scan | current directory |
-| `-f, --max-files` | Maximum files to analyze | 200 |
-| `-b, --batch-size` | Files per batch | 20 |
-| `-s, --max-size` | Maximum file size (KB) | 100 |
-| `-d, --batch-delay` | Delay between batches (ms) | 1000 |
-| `-o, --output` | Report output path | - |
-| `--format` | Output format (md/html) | md |
-| `--mobile` | Enable mobile emulation | false |
-| `--cpu-throttle` | CPU slowdown multiplier | 4 |
-| `--network-throttle` | Network throttle type | fast3G |
+| Option               | Description                | Default           |
+| -------------------- | -------------------------- | ----------------- |
+| `-c, --config`       | Path to config file        | -                 |
+| `-p, --port`         | Development server port    | auto-detect       |
+| `-t, --target`       | Target directory to scan   | current directory |
+| `-f, --max-files`    | Maximum files to analyze   | 200               |
+| `-b, --batch-size`   | Files per batch            | 20                |
+| `-s, --max-size`     | Maximum file size (KB)     | 100               |
+| `-d, --batch-delay`  | Delay between batches (ms) | 1000              |
+| `-o, --output`       | Report output path         | -                 |
+| `--format`           | Output format (md/html)    | md                |
+| `--mobile`           | Enable mobile emulation    | false             |
+| `--cpu-throttle`     | CPU slowdown multiplier    | 4                 |
+| `--network-throttle` | Network throttle type      | fast3G            |
 
 ## Documentation
 
@@ -214,6 +224,7 @@ perf-lens scan [options]
 - [Examples](examples/)
 
 ## Requirements
+
 - Node.js >= 18
 - Running development server
 - AI Provider API Key (OpenAI, Anthropic, or Gemini)

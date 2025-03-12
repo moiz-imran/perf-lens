@@ -1,15 +1,15 @@
-import { Command } from "commander";
-import chalk from "chalk";
-import ora from "ora";
-import path from "path";
-import { runLighthouse } from "../../utils/lighthouse.js";
-import { analyzeCodebase } from "../../utils/codeAnalysis.js";
-import { saveReport } from "../../utils/output.js";
-import { loadConfig } from "../../utils/config.js";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import path from 'path';
+import { runLighthouse } from '../../utils/lighthouse.js';
+import { analyzeCodebase } from '../../utils/codeAnalysis.js';
+import { saveReport } from '../../utils/output.js';
+import { loadConfig } from '../../utils/config.js';
 
 export function createScanCommand(): Command {
-  const scanCommand = new Command("scan")
-    .description("Scan your frontend UI for performance issues")
+  const scanCommand = new Command('scan')
+    .description('Scan your frontend UI for performance issues')
     .option('-c, --config <path>', 'Path to config file')
     .option('-p, --port <number>', 'Development server port')
     .option('-t, --target <directory>', 'Target directory to scan (default: current directory)')
@@ -25,7 +25,7 @@ export function createScanCommand(): Command {
     .option('--verbose', 'Enable verbose output')
     .option('--timeout <number>', 'Timeout in milliseconds for Lighthouse analysis')
     .option('--retries <number>', 'Number of retries for failed operations')
-    .action(async (options) => {
+    .action(async options => {
       const startTime = Date.now();
 
       try {
@@ -34,7 +34,9 @@ export function createScanCommand(): Command {
         console.log(chalk.gray('─'.repeat(50)));
 
         // Load configuration
-        const config = await loadConfig(options.config ? path.resolve(process.cwd(), options.config) : undefined);
+        const config = await loadConfig(
+          options.config ? path.resolve(process.cwd(), options.config) : undefined
+        );
 
         // Override config with CLI options
         if (options.maxFiles) config.analysis!.maxFiles = parseInt(options.maxFiles);
@@ -50,12 +52,17 @@ export function createScanCommand(): Command {
           config.output = {
             ...config.output,
             directory: path.dirname(outputPath),
-            filename: path.basename(outputPath, path.extname(outputPath))
+            filename: path.basename(outputPath, path.extname(outputPath)),
           };
         }
         if (options.mobile) config.lighthouse!.mobileEmulation = true;
         if (options.cpuThrottle) config.lighthouse!.throttling!.cpu = parseInt(options.cpuThrottle);
-        if (options.networkThrottle) config.lighthouse!.throttling!.network = options.networkThrottle as 'slow3G' | 'fast3G' | '4G' | 'none';
+        if (options.networkThrottle)
+          config.lighthouse!.throttling!.network = options.networkThrottle as
+            | 'slow3G'
+            | 'fast3G'
+            | '4G'
+            | 'none';
         if (options.timeout) config.lighthouse!.timeout = parseInt(options.timeout);
         if (options.retries) config.lighthouse!.retries = parseInt(options.retries);
 
@@ -67,7 +74,9 @@ export function createScanCommand(): Command {
           }
           console.log(`Maximum files to analyze: ${chalk.yellow(config.analysis?.maxFiles)}`);
           console.log(`Files per batch: ${chalk.yellow(config.analysis?.batchSize)}`);
-          console.log(`Maximum file size: ${chalk.yellow(config.analysis?.maxFileSize ? Math.round(config.analysis.maxFileSize / 1024) + 'KB' : '100KB')}`);
+          console.log(
+            `Maximum file size: ${chalk.yellow(config.analysis?.maxFileSize ? Math.round(config.analysis.maxFileSize / 1024) + 'KB' : '100KB')}`
+          );
           console.log(`Batch delay: ${chalk.yellow(config.analysis?.batchDelay)}ms`);
           if (config.analysis?.ignore?.length) {
             console.log(`Ignore patterns: ${chalk.yellow(config.analysis.ignore.length)} patterns`);
@@ -102,7 +111,7 @@ export function createScanCommand(): Command {
             bundleThresholds: config.bundleThresholds,
             performanceThresholds: config.thresholds,
             verbose: config.verbose,
-            ai: config.ai
+            ai: config.ai,
           });
 
           // Step 2: Code analysis with Lighthouse context
@@ -121,14 +130,16 @@ export function createScanCommand(): Command {
                 analysis: lhResults.analysis,
               },
               ignore: config.analysis?.ignore,
-              verbose: config.verbose
+              verbose: config.verbose,
             });
 
             if (config.verbose) {
               // Display results in console
               console.log('\n' + chalk.blue.bold('🧠 Code Analysis'));
               console.log(chalk.gray('─'.repeat(50)));
-              console.log(`\nFound ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`);
+              console.log(
+                `\nFound ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`
+              );
 
               if (codeAnalysisResults.critical.length > 0) {
                 console.log(chalk.red.bold('\n🚨 Critical Code Issues:'));
@@ -163,14 +174,8 @@ export function createScanCommand(): Command {
               metadata: {
                 timestamp: new Date().toISOString(),
                 duration: Date.now() - startTime,
-                config: {
-                  ...config,
-                  lighthouse: {
-                    ...config.lighthouse,
-                    throttling: config.lighthouse?.throttling
-                  }
-                }
-              }
+                config,
+              },
             };
 
             const savedPath = saveReport(
@@ -190,17 +195,31 @@ export function createScanCommand(): Command {
             console.log(chalk.gray('─'.repeat(50)));
 
             if (config.verbose) {
-              console.log(chalk.gray('Review the two reports above for a complete understanding of your application\'s performance:'));
-              console.log(chalk.blue('1. 🌟 Lighthouse Performance Report - Runtime metrics and opportunities'));
-              console.log(chalk.blue('2. 🧠 Code Analysis - Specific code-level improvements based on Lighthouse insights'));
+              console.log(
+                chalk.gray(
+                  "Review the two reports above for a complete understanding of your application's performance:"
+                )
+              );
+              console.log(
+                chalk.blue(
+                  '1. 🌟 Lighthouse Performance Report - Runtime metrics and opportunities'
+                )
+              );
+              console.log(
+                chalk.blue(
+                  '2. 🧠 Code Analysis - Specific code-level improvements based on Lighthouse insights'
+                )
+              );
             }
-
           } catch (error) {
             console.error(chalk.red('Error during code analysis:'), error);
             process.exit(1);
           }
         } catch (lhError) {
-          if (lhError instanceof Error && lhError.message.includes('No development server detected')) {
+          if (
+            lhError instanceof Error &&
+            lhError.message.includes('No development server detected')
+          ) {
             console.log(lhError.message);
             process.exit(1);
           }
