@@ -1,6 +1,15 @@
 # PerfLens 🔍
 
-A performance analysis tool that combines Lighthouse performance audits with static code analysis to help optimize your web applications.
+A powerful performance analysis tool for web applications that combines Lighthouse audits with AI-powered code analysis.
+
+[![CI](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml)
+[![npm version](https://badge.fury.io/js/perf-lens.svg)](https://badge.fury.io/js/perf-lens)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/perf-lens)](https://bundlephobia.com/package/perf-lens)
+[![Dependencies](https://img.shields.io/librariesio/release/npm/perf-lens)](https://libraries.io/npm/perf-lens)
+[![Known Vulnerabilities](https://snyk.io/test/github/moiz-imran/perf-lens/badge.svg)](https://snyk.io/test/github/moiz-imran/perf-lens)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
+[![Node Version](https://img.shields.io/node/v/perf-lens)](https://nodejs.org)
 
 ## Features
 
@@ -13,7 +22,7 @@ A performance analysis tool that combines Lighthouse performance audits with sta
   - Network request analysis
   - Resource loading optimization
 
-### 🧠 Static Code Analysis
+### 🧠 AI-Powered Code Analysis
 - Framework-aware code scanning
 - Performance pattern detection
 - Batch processing of files with:
@@ -32,24 +41,17 @@ A performance analysis tool that combines Lighthouse performance audits with sta
 
 ## Installation
 
-```bash
-npm install -g perf-lens
-# or
-yarn global add perf-lens
-```
-
-### Project Setup
-
-For project-specific configuration, install PerfLens as a dev dependency:
+Install PerfLens as a dev dependency in your project:
 
 ```bash
 npm install --save-dev perf-lens
 # or
 yarn add -D perf-lens
+# or
+pnpm add -D perf-lens
 ```
 
-Add analysis scripts to your `package.json`:
-
+Add scripts to your `package.json`:
 ```json
 {
   "scripts": {
@@ -60,42 +62,44 @@ Add analysis scripts to your `package.json`:
 }
 ```
 
-## Usage
+Now you can run PerfLens using:
+```bash
+npm run analyze
+```
 
-### Basic Analysis
+### Global Installation
 
-Run a performance analysis on your development server:
+While not recommended, you can also install PerfLens globally:
 
+```bash
+npm install -g perf-lens
+# Then use directly:
+perf-lens scan
+```
+
+## Quick Start
+
+1. Configure your AI provider:
+```bash
+# Using environment variables
+export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
+
+# Or using the CLI
+perf-lens config set-key YOUR_API_KEY --provider anthropic
+```
+
+2. Run PerfLens:
 ```bash
 perf-lens scan
 ```
 
-The tool will automatically detect your development server port.
+The tool will automatically:
+- Detect your development server
+- Run performance audits
+- Analyze your codebase
+- Generate a detailed report
 
-### Configuration
-
-#### AI Provider Configuration
-
-PerfLens supports multiple AI providers for code analysis. You can configure your preferred provider using environment variables or the config CLI:
-
-```bash
-# OpenAI (default)
-perf-lens config set-key YOUR_API_KEY --provider openai
-# or use environment variable:
-export PERF_LENS_OPENAI_API_KEY=your_key_here
-
-# Anthropic
-perf-lens config set-key YOUR_API_KEY --provider anthropic
-# or use environment variable:
-export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
-
-# Google (Gemini)
-perf-lens config set-key YOUR_API_KEY --provider gemini
-# or use environment variable:
-export PERF_LENS_GEMINI_API_KEY=your_key_here
-```
-
-#### Configuration File
+## Configuration
 
 Create a `perflens.config.js` file in your project root:
 
@@ -105,30 +109,29 @@ export default {
   // Performance thresholds
   thresholds: {
     performance: 90,
-    firstContentfulPaint: 2000,
-    largestContentfulPaint: 2500,
-    totalBlockingTime: 200,
-    cumulativeLayoutShift: 0.1,
+    fcp: 2000,
+    lcp: 2500,
+    tbt: 200,
+    cls: 0.1,
     speedIndex: 3000,
-    timeToInteractive: 3800
+    tti: 3800
   },
 
   // Bundle size thresholds
   bundleThresholds: {
-    maxBundleSize: '250kb',
+    maxInitialSize: '250kb',
     maxChunkSize: '50kb',
-    maxAssetSize: '100kb',
-    maxImageSize: '100kb',
-    maxFontSize: '50kb'
+    maxAsyncChunks: 5,
+    maxTotalSize: '1mb'
   },
 
   // Analysis configuration
   analysis: {
+    targetDir: 'src',
     maxFiles: 200,
     batchSize: 20,
     maxFileSize: 102400, // 100KB
     batchDelay: 1000,
-    targetDir: 'src',
     include: [ // File patterns to include
       '**/*.js',
       '**/*.jsx',
@@ -144,58 +147,9 @@ export default {
       '**/*.html'
     ],
     ignore: [ // Patterns to ignore (in addition to .perflensignore)
-      // Build and dependency directories
       '**/node_modules/**',
       '**/dist/**',
-      '**/build/**',
-      '**/.git/**',
-      '**/coverage/**',
-      '**/.next/**',
-      '**/.nuxt/**',
-      '**/.svelte-kit/**',
-      '**/.astro/**',
-
-      // Generated and minified files
-      '**/*.min.js',
-      '**/*.bundle.js',
-      '**/*.chunk.js',
-      '**/*.map',
-      '**/*.d.ts',
-
-      // Test files
-      '**/*.test.*',
-      '**/*.spec.*',
-      '**/__tests__/**',
-      '**/__mocks__/**',
-      '**/test/**',
-      '**/tests/**',
-
-      // Documentation and examples
-      '**/docs/**',
-      '**/examples/**',
-      '**/demo/**',
-      '**/demos/**',
-
-      // Configuration files
-      '**/*.config.*',
-      '**/*.rc.*',
-      '**/tsconfig.json',
-      '**/package.json',
-      '**/package-lock.json',
-      '**/yarn.lock',
-      '**/pnpm-lock.yaml',
-
-      // Editor and IDE files
-      '**/.vscode/**',
-      '**/.idea/**',
-      '**/.DS_Store',
-
-      // Temporary and cache files
-      '**/.cache/**',
-      '**/.temp/**',
-      '**/.tmp/**',
-      '**/tmp/**',
-      '**/temp/**'
+      '**/build/**'
     ]
   },
 
@@ -217,21 +171,22 @@ export default {
     includeTimestamp: true
   },
 
-  // AI model configuration
-  aiConfig: {
-    provider: 'openai', // 'openai' | 'anthropic' | 'gemini'
-    model: 'o3-mini', // model identifier
-    temperature: 0.2, // controls randomness (0-1)
-    maxTokens: 4096 // maximum response length
+  // AI configuration
+  ai: {
+    provider: 'anthropic',
+    model: 'claude-3-5-haiku-20241022',
+    maxTokens: 8192,
+    temperature: 0.2
   }
 };
 ```
 
-### Advanced Options
+See [Configuration Reference](docs/configuration/README.md) for all options.
 
-Customize the analysis:
+## CLI Options
+
 ```bash
-perf-lens scan --max-files 50 --batch-size 10 --max-size 100
+perf-lens scan [options]
 ```
 
 | Option | Description | Default |
@@ -247,101 +202,42 @@ perf-lens scan --max-files 50 --batch-size 10 --max-size 100
 | `--format` | Output format (md/html) | md |
 | `--mobile` | Enable mobile emulation | false |
 | `--cpu-throttle` | CPU slowdown multiplier | 4 |
-| `--network-throttle` | Network throttle type (slow3G/fast3G/4G/none) | fast3G |
+| `--network-throttle` | Network throttle type | fast3G |
 
-### Generate Reports
+## Documentation
 
-Save analysis as Markdown:
-```bash
-perf-lens scan --output report.md
-```
-
-Generate HTML report:
-```bash
-perf-lens scan --output report.html --format html
-```
-
-### Ignore Files
-
-Create a `.perflensignore` file in your project root to specify additional files to ignore:
-
-```text
-# Build output
-dist/
-build/
-.next/
-.nuxt/
-
-# Dependencies
-node_modules/
-.pnpm-store/
-
-# Test files
-__tests__/
-*.test.*
-*.spec.*
-
-# Documentation
-docs/
-examples/
-
-# Editor files
-.vscode/
-.idea/
-.DS_Store
-```
-
-The ignore patterns from `.perflensignore` are automatically merged with the patterns specified in the `analysis.ignore` section of your config file.
-
-## How It Works
-
-### 1. Development Server Analysis
-- Automatically detects your dev server
-- Runs Lighthouse performance audits
-- Collects Core Web Vitals metrics
-- Analyzes resource usage
-
-### 2. Code Analysis
-- Scans your codebase for:
-  - Performance bottlenecks
-  - Resource optimization opportunities
-  - Bundle size issues
-  - Loading optimizations
-- Prioritizes files based on:
-  - Entry points and key components
-  - File size and complexity
-  - Framework patterns
-
-### 3. Report Generation
-Generates comprehensive reports with:
-- Performance Metrics
-  - Core Web Vitals scores
-  - Performance opportunities
-  - Resource usage breakdown
-
-- Code Analysis
-  - Critical performance issues
-  - Warnings and suggestions
-  - Code-level recommendations
-
-## Supported File Types
-- JavaScript (\`.js\`, \`.jsx\`)
-- TypeScript (\`.ts\`, \`.tsx\`)
-- Vue (\`.vue\`)
-- Svelte (\`.svelte\`)
-- Astro (\`.astro\`)
-- Stylesheets (\`.css\`, \`.scss\`, \`.less\`, \`.sass\`)
-- HTML (\`.html\`)
+- [Getting Started Guide](docs/guides/getting-started.md)
+- [Configuration Reference](docs/configuration/README.md)
+- [API Documentation](docs/api/README.md)
+- [Examples](examples/)
 
 ## Requirements
 - Node.js >= 18
 - Running development server
-- OpenAI API Key
+- AI Provider API Key (OpenAI, Anthropic, or Gemini)
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### Dependency Licenses
+
+This project uses several open-source packages that are licensed under various licenses:
+
+- **Primary License**: MIT
+- **Notable Dependencies**:
+  - `lighthouse` (Apache-2.0)
+  - `axe-core` (MPL-2.0) - via Lighthouse
+  - Other dependencies are primarily MIT/Apache-2.0 licensed
+
+Please note that some transitive dependencies may have different licenses. We recommend reviewing the licenses of all dependencies if you plan to use this project in a commercial setting.
 
 ---
 
-Built with ❤️ by Moiz Imran
+Built with ❤️ by [Moiz Imran](https://linkedin.com/in/moiz-imran)
+
+📧 Email: moizwasti@gmail.com
