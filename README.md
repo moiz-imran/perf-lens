@@ -11,6 +11,8 @@ A powerful performance analysis tool for web applications that combines Lighthou
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
 [![Node Version](https://img.shields.io/node/v/perf-lens)](https://nodejs.org)
 
+> This project follows [Semantic Versioning](https://semver.org/). For the versions available, see the [tags on this repository](https://github.com/moiz-imran/perf-lens/tags).
+
 ## Features
 
 ### 🌟 Lighthouse Performance Analysis
