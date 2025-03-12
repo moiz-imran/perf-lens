@@ -162,10 +162,11 @@ program
         });
 
         // Step 2: Code analysis with Lighthouse context
-        console.log('\n' + chalk.blue.bold('🧠 Code Analysis'));
-        console.log(chalk.gray('─'.repeat(50)));
+
+        const spinner = ora('Analyzing your code...').start();
+
         if (config.verbose) {
-          console.log(chalk.gray('Analyzing your codebase with Lighthouse insights...'));
+          spinner.stop();
         }
 
         try {
@@ -181,6 +182,8 @@ program
 
           if (config.verbose) {
             // Display results in console
+            console.log('\n' + chalk.blue.bold('🧠 Code Analysis'));
+            console.log(chalk.gray('─'.repeat(50)));
             console.log(`\nFound ${chalk.red(codeAnalysisResults.critical.length.toString())} critical, ${chalk.yellow(codeAnalysisResults.warnings.length.toString())} warnings, and ${chalk.blue(codeAnalysisResults.suggestions.length.toString())} suggestions.\n`);
 
             if (codeAnalysisResults.critical.length > 0) {
@@ -198,6 +201,8 @@ program
               codeAnalysisResults.suggestions.forEach(issue => console.log(issue));
             }
           }
+
+          spinner.succeed('Code analysis complete!');
 
           // Save report
           const reportData = {
