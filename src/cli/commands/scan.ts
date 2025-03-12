@@ -69,8 +69,8 @@ export function createScanCommand(): Command {
           console.log(`Files per batch: ${chalk.yellow(config.analysis?.batchSize)}`);
           console.log(`Maximum file size: ${chalk.yellow(config.analysis?.maxFileSize ? Math.round(config.analysis.maxFileSize / 1024) + 'KB' : '100KB')}`);
           console.log(`Batch delay: ${chalk.yellow(config.analysis?.batchDelay)}ms`);
-          if (config.ignore?.length) {
-            console.log(`Ignore patterns: ${chalk.yellow(config.ignore.length)} patterns`);
+          if (config.analysis?.ignore?.length) {
+            console.log(`Ignore patterns: ${chalk.yellow(config.analysis.ignore.length)} patterns`);
           }
           if (config.lighthouse?.port) {
             console.log(`Development server port: ${chalk.yellow(config.lighthouse.port)}`);
@@ -120,7 +120,7 @@ export function createScanCommand(): Command {
                 metrics: lhResults.metrics,
                 analysis: lhResults.analysis,
               },
-              ignore: config.ignore,
+              ignore: config.analysis?.ignore,
               verbose: config.verbose
             });
 

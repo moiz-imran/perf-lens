@@ -1,12 +1,18 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { createAIModel } from '../ai/models.js';
+import { AIModel, createAIModel } from '../ai/models.js';
 import type { AIProvider, AIModelConfig } from '../types/config.js';
 
 // Configuration paths
 const CONFIG_DIR = path.join(os.homedir(), '.perf-lens');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+
+const DEFAULT_MODELS = {
+  openai: 'o3-mini',
+  anthropic: 'claude-3-5-haiku-20241022',
+  gemini: 'gemini-1.5-pro'
+}
 
 interface Config {
   openaiApiKey?: string;
@@ -105,7 +111,7 @@ export function getApiKey(provider: AIProvider): string | undefined {
  * @returns {AIModel} The created AI model instance
  * @throws {Error} If the API key is not found or the model creation fails
  */
-export function createModel(config: AIModelConfig) {
+export function createModel(config: AIModelConfig): AIModel {
   const apiKey = getApiKey(config.provider);
   if (!apiKey) {
     throw new Error(
@@ -131,7 +137,7 @@ export async function validateApiKey(key: string, provider: AIProvider): Promise
   try {
     const model = createModel({
       provider,
-      model: provider === 'openai' ? 'o3-mini' : provider === 'anthropic' ? 'claude-3-7-sonnet-20250219' : 'gemini-pro',
+      model: DEFAULT_MODELS[provider],
       apiKey: key
     });
 

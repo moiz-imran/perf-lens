@@ -175,32 +175,40 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
   // First Contentful Paint
   const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
   output += `* First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.firstContentfulPaint && fcp > performanceThresholds.firstContentfulPaint) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.firstContentfulPaint}ms)`;
+  if (performanceThresholds?.fcp && fcp > performanceThresholds.fcp) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.fcp}ms)`;
+  }
+  output += '\n';
+
+  // First Input Delay
+  const fid = parseFloat(metrics['first-input-delay']?.numericValue) || 0;
+  output += `* First Input Delay: ${metrics['first-input-delay']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.fid && fid > performanceThresholds.fid) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.fid}ms)`;
   }
   output += '\n';
 
   // Largest Contentful Paint
   const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
   output += `* Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.largestContentfulPaint && lcp > performanceThresholds.largestContentfulPaint) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.largestContentfulPaint}ms)`;
+  if (performanceThresholds?.lcp && lcp > performanceThresholds.lcp) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.lcp}ms)`;
   }
   output += '\n';
 
   // Total Blocking Time
   const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
   output += `* Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.totalBlockingTime && tbt > performanceThresholds.totalBlockingTime) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.totalBlockingTime}ms)`;
+  if (performanceThresholds?.tbt && tbt > performanceThresholds.tbt) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.tbt}ms)`;
   }
   output += '\n';
 
   // Cumulative Layout Shift
   const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
   output += `* Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.cumulativeLayoutShift && cls > performanceThresholds.cumulativeLayoutShift) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.cumulativeLayoutShift})`;
+  if (performanceThresholds?.cls && cls > performanceThresholds.cls) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.cls})`;
   }
   output += '\n';
 
@@ -215,8 +223,8 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
   // Time to Interactive
   const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
   output += `* Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.timeToInteractive && tti > performanceThresholds.timeToInteractive) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.timeToInteractive}ms)`;
+  if (performanceThresholds?.tti && tti > performanceThresholds.tti) {
+    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.tti}ms)`;
   }
   output += '\n\n';
 
@@ -251,13 +259,13 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
     // Check against thresholds
     if (bundleThresholds) {
       const totalBundleKb = totalJsSize / 1024;
-      const maxBundleKb = parseInt(bundleThresholds.maxBundleSize || '0');
+      const maxBundleKb = parseSizeString(bundleThresholds.maxInitialSize || '0kb');
       if (maxBundleKb > 0 && totalBundleKb > maxBundleKb) {
         output += `⚠️ Total bundle size (${totalBundleKb.toFixed(1)}KB) exceeds threshold (${maxBundleKb}KB)\n`;
       }
 
       // Check chunk sizes
-      const maxChunkKb = parseInt(bundleThresholds.maxChunkSize || '0');
+      const maxChunkKb = parseSizeString(bundleThresholds.maxChunkSize || '0kb');
       if (maxChunkKb > 0) {
         const largeChunks = jsChunks.filter(chunk => chunk.size / 1024 > maxChunkKb);
         if (largeChunks.length > 0) {
@@ -268,46 +276,21 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
         }
       }
 
-      // Check general asset size (applies to all resource types)
-      const maxAssetKb = parseInt(bundleThresholds.maxAssetSize || '0');
-      if (maxAssetKb > 0) {
-        const largeAssets = requests
-          .filter(item => item.transferSize && item.transferSize / 1024 > maxAssetKb)
-          .map(item => ({
-            url: item.url || '',
-            size: item.transferSize || 0,
-            type: item.resourceType || 'unknown'
-          }));
-
-        if (largeAssets.length > 0) {
-          output += '\n### Large Assets:\n';
-          largeAssets.forEach(asset => {
-            output += `* [${asset.type}] ${asset.url}: ${(asset.size / 1024).toFixed(1)}KB (exceeds ${maxAssetKb}KB limit)\n`;
-          });
+      // Check total size
+      const maxTotalKb = parseSizeString(bundleThresholds.maxTotalSize || '0kb');
+      if (maxTotalKb > 0) {
+        const totalSizeKb = requests.reduce((acc, item) => acc + (item.transferSize || 0), 0) / 1024;
+        if (totalSizeKb > maxTotalKb) {
+          output += `\n⚠️ Total transfer size (${totalSizeKb.toFixed(1)}KB) exceeds threshold (${maxTotalKb}KB)\n`;
         }
       }
 
-      // Check image sizes
-      const maxImageKb = parseInt(bundleThresholds.maxImageSize || '0');
-      if (maxImageKb > 0) {
-        const largeImages = assetSizes.images.filter(img => img.size / 1024 > maxImageKb);
-        if (largeImages.length > 0) {
-          output += '\n### Large Images:\n';
-          largeImages.forEach(img => {
-            output += `* ${img.url}: ${(img.size / 1024).toFixed(1)}KB (exceeds ${maxImageKb}KB limit)\n`;
-          });
-        }
-      }
-
-      // Check font sizes
-      const maxFontKb = parseInt(bundleThresholds.maxFontSize || '0');
-      if (maxFontKb > 0) {
-        const largeFonts = assetSizes.fonts.filter(font => font.size / 1024 > maxFontKb);
-        if (largeFonts.length > 0) {
-          output += '\n### Large Fonts:\n';
-          largeFonts.forEach(font => {
-            output += `* ${font.url}: ${(font.size / 1024).toFixed(1)}KB (exceeds ${maxFontKb}KB limit)\n`;
-          });
+      // Check async chunks
+      const maxAsyncChunks = bundleThresholds.maxAsyncChunks || 0;
+      if (maxAsyncChunks > 0) {
+        const asyncChunks = jsChunks.filter(chunk => chunk.url.includes('chunk') || chunk.url.includes('async'));
+        if (asyncChunks.length > maxAsyncChunks) {
+          output += `\n⚠️ Number of async chunks (${asyncChunks.length}) exceeds threshold (${maxAsyncChunks})\n`;
         }
       }
     }
@@ -418,32 +401,40 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
   // First Contentful Paint
   const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
   output += `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.firstContentfulPaint && fcp > performanceThresholds.firstContentfulPaint) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.firstContentfulPaint}ms`);
+  if (performanceThresholds?.fcp && fcp > performanceThresholds.fcp) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.fcp}ms`);
+  }
+  output += '\n';
+
+  // First Input Delay
+  const fid = parseFloat(metrics['first-input-delay']?.numericValue) || 0;
+  output += `First Input Delay: ${metrics['first-input-delay']?.displayValue || 'N/A'}`;
+  if (performanceThresholds?.fid && fid > performanceThresholds.fid) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.fid}ms`);
   }
   output += '\n';
 
   // Largest Contentful Paint
   const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
   output += `Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.largestContentfulPaint && lcp > performanceThresholds.largestContentfulPaint) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.largestContentfulPaint}ms`);
+  if (performanceThresholds?.lcp && lcp > performanceThresholds.lcp) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.lcp}ms`);
   }
   output += '\n';
 
   // Total Blocking Time
   const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
   output += `Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.totalBlockingTime && tbt > performanceThresholds.totalBlockingTime) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.totalBlockingTime}ms`);
+  if (performanceThresholds?.tbt && tbt > performanceThresholds.tbt) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.tbt}ms`);
   }
   output += '\n';
 
   // Cumulative Layout Shift
   const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
   output += `Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.cumulativeLayoutShift && cls > performanceThresholds.cumulativeLayoutShift) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.cumulativeLayoutShift}`);
+  if (performanceThresholds?.cls && cls > performanceThresholds.cls) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.cls}`);
   }
   output += '\n';
 
@@ -458,8 +449,8 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
   // Time to Interactive
   const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
   output += `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.timeToInteractive && tti > performanceThresholds.timeToInteractive) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.timeToInteractive}ms`);
+  if (performanceThresholds?.tti && tti > performanceThresholds.tti) {
+    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.tti}ms`);
   }
   output += '\n\n';
 
@@ -728,6 +719,30 @@ Implement server-side caching and optimize database queries.
 
   // Return the section analyses
   return analysisResults.map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`).join('\n\n');
+}
+
+/**
+ * Parses a size string (e.g., '200kb', '1mb') into kilobytes
+ * @param size - The size string to parse
+ * @returns The size in kilobytes
+ */
+function parseSizeString(size: string): number {
+  const match = size.match(/^(\d+(?:\.\d+)?)(kb|mb|gb)$/i);
+  if (!match) return 0;
+
+  const [, value, unit] = match;
+  const numValue = parseFloat(value);
+
+  switch (unit.toLowerCase()) {
+    case 'kb':
+      return numValue;
+    case 'mb':
+      return numValue * 1024;
+    case 'gb':
+      return numValue * 1024 * 1024;
+    default:
+      return 0;
+  }
 }
 
 /**
