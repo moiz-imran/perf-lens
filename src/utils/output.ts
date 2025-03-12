@@ -183,7 +183,10 @@ function formatMarkdownToHtml(text: string): string {
 
   // Convert paragraphs (lines with content)
   text = text.split('\n').map(line => {
-    if (line.trim() && !line.match(/<\/?[a-z][^>]*>/i) && !line.includes('__CODE_BLOCK_') && !line.includes('__INLINE_CODE_')) {
+    if (line.trim() &&
+        !line.match(/^<(div|pre|p|h[1-6]|ul|ol|li)[^>]*>/i) && // Only exclude block-level elements
+        !line.includes('__CODE_BLOCK_') &&
+        !line.includes('__INLINE_CODE_')) {
       return `<p>${line}</p>`;
     }
     return line;

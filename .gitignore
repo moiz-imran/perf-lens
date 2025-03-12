@@ -31,3 +31,6 @@ yarn-error.log*
 
 # Test coverage
 coverage/
+
+# Local test files
+test-local/
