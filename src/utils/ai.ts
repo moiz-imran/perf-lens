@@ -16,7 +16,7 @@ interface Config {
 }
 
 /**
- * Ensures the configuration directory exists
+ * Ensures the configuration directory exists in the user's home directory
  */
 function ensureConfigDir(): void {
   if (!fs.existsSync(CONFIG_DIR)) {
@@ -25,7 +25,8 @@ function ensureConfigDir(): void {
 }
 
 /**
- * Gets the current configuration
+ * Retrieves the current AI configuration from disk
+ * @returns {Config} The current configuration object
  */
 function getConfig(): Config {
   try {
@@ -40,7 +41,9 @@ function getConfig(): Config {
 }
 
 /**
- * Saves the configuration to disk
+ * Saves the AI configuration to disk
+ * @param {Config} config - The configuration object to save
+ * @throws {Error} If saving the configuration fails
  */
 function saveConfig(config: Config): void {
   try {
@@ -53,7 +56,10 @@ function saveConfig(config: Config): void {
 }
 
 /**
- * Sets the API key for a specific provider
+ * Sets the API key for a specific AI provider
+ * @param {string} key - The API key to set
+ * @param {AIProvider} provider - The AI provider to set the key for
+ * @throws {Error} If the provider is not supported
  */
 export function setApiKey(key: string, provider: AIProvider): void {
   const config = getConfig();
@@ -74,7 +80,10 @@ export function setApiKey(key: string, provider: AIProvider): void {
 }
 
 /**
- * Gets the API key for a specific provider
+ * Gets the API key for a specific AI provider from environment variables or config file
+ * @param {AIProvider} provider - The AI provider to get the key for
+ * @returns {string | undefined} The API key if found, undefined otherwise
+ * @throws {Error} If the provider is not supported
  */
 export function getApiKey(provider: AIProvider): string | undefined {
   const config = getConfig();
@@ -91,7 +100,10 @@ export function getApiKey(provider: AIProvider): string | undefined {
 }
 
 /**
- * Creates an AI model instance based on configuration
+ * Creates an AI model instance based on the provided configuration
+ * @param {AIModelConfig} config - The configuration for the AI model
+ * @returns {AIModel} The created AI model instance
+ * @throws {Error} If the API key is not found or the model creation fails
  */
 export function createModel(config: AIModelConfig) {
   const apiKey = getApiKey(config.provider);
@@ -110,7 +122,10 @@ export function createModel(config: AIModelConfig) {
 }
 
 /**
- * Validates the API key for a specific provider
+ * Validates an API key for a specific AI provider by testing the connection
+ * @param {string} key - The API key to validate
+ * @param {AIProvider} provider - The AI provider to validate the key for
+ * @returns {Promise<boolean>} True if the key is valid, false otherwise
  */
 export async function validateApiKey(key: string, provider: AIProvider): Promise<boolean> {
   try {

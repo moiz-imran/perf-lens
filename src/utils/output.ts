@@ -20,6 +20,11 @@ interface PerformanceReport {
   };
 }
 
+/**
+ * Generates a markdown report from performance analysis data
+ * @param {PerformanceReport} data - The performance analysis data to format
+ * @returns {string} A formatted markdown report
+ */
 export function generateMarkdownReport(data: PerformanceReport): string {
   return `# Performance Analysis Report
 ${data.metadata ? `
@@ -59,6 +64,11 @@ ${data.codeAnalysis.suggestions.length > 0
 `;
 }
 
+/**
+ * Converts markdown text to HTML with proper formatting and syntax highlighting
+ * @param {string} text - The markdown text to convert
+ * @returns {string} The converted HTML text
+ */
 function formatMarkdownToHtml(text: string): string {
   // First, escape any existing HTML to prevent injection
   text = text.replace(/&/g, '&amp;')
@@ -218,6 +228,11 @@ function formatMarkdownToHtml(text: string): string {
     .trim();
 }
 
+/**
+ * Generates an HTML report from performance analysis data with styling
+ * @param {PerformanceReport} data - The performance analysis data to format
+ * @returns {string} A formatted HTML report with embedded styles
+ */
 export function generateHtmlReport(data: PerformanceReport): string {
   const formatMetricValue = (value: string | undefined) => {
     if (!value) return 'N/A';
@@ -645,6 +660,11 @@ export function generateHtmlReport(data: PerformanceReport): string {
 </html>`;
 }
 
+/**
+ * Formats an issue message with appropriate styling
+ * @param {string} issue - The issue message to format
+ * @returns {string} The formatted issue message
+ */
 function formatIssue(issue: string): string {
   const parts = issue.split('\n');
   const firstLine = parts[0];
@@ -666,6 +686,13 @@ function formatIssue(issue: string): string {
   `;
 }
 
+/**
+ * Saves a performance report in the specified format
+ * @param {PerformanceReport} data - The performance analysis data to save
+ * @param {'md' | 'html'} format - The output format (markdown or HTML)
+ * @param {string} [outputPath] - Optional path to save the report
+ * @returns {string} The path where the report was saved
+ */
 export function saveReport(data: PerformanceReport, format: 'md' | 'html' = 'md', outputPath?: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const defaultFileName = `performance-report-${timestamp}`;

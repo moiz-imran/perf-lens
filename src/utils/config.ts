@@ -179,7 +179,9 @@ const configSchema = z.object({
 });
 
 /**
- * Load ignore patterns from .perflensignore file
+ * Loads ignore patterns from a .perflensignore file in the specified directory
+ * @param {string} [cwd=process.cwd()] - The directory to look for the ignore file
+ * @returns {string[]} Array of ignore patterns
  */
 export function loadIgnorePatterns(cwd: string = process.cwd()): string[] {
   const ignoreFile = path.join(cwd, '.perflensignore');
@@ -193,7 +195,10 @@ export function loadIgnorePatterns(cwd: string = process.cwd()): string[] {
 }
 
 /**
- * Load and validate configuration
+ * Loads and validates the PerfLens configuration from various sources
+ * @param {string} [configPath] - Optional path to a specific config file
+ * @returns {Promise<PerflensConfig>} The validated and merged configuration
+ * @throws {Error} If the configuration is invalid
  */
 export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
   const explorer = cosmiconfig('perflens', {

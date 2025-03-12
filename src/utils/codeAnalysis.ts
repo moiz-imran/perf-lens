@@ -38,7 +38,10 @@ interface CodeAnalysisResult {
 }
 
 /**
- * Calculate priority score for a file based on various factors
+ * Calculates a priority score for a file based on various factors like file type, location, and size
+ * @param {string} filePath - The path to the file
+ * @param {number} size - The size of the file in bytes
+ * @returns {number} A priority score (higher is better)
  */
 function calculateFilePriority(filePath: string, size: number): number {
   let score = 0;
@@ -63,7 +66,10 @@ function calculateFilePriority(filePath: string, size: number): number {
 }
 
 /**
- * Check if a file should be ignored based on patterns
+ * Checks if a file should be ignored based on provided ignore patterns
+ * @param {string} filePath - The path to the file
+ * @param {string[]} ignorePatterns - Array of glob patterns to ignore
+ * @returns {boolean} True if the file should be ignored
  */
 function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
   const relativePath = path.relative(process.cwd(), filePath);
@@ -74,7 +80,10 @@ function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
 }
 
 /**
- * Check if a file should be included based on patterns
+ * Checks if a file should be included based on provided include patterns
+ * @param {string} filePath - The path to the file
+ * @param {string[]} includePatterns - Array of glob patterns to include
+ * @returns {boolean} True if the file should be included
  */
 function shouldIncludeFile(filePath: string, includePatterns: string[]): boolean {
   const relativePath = path.relative(process.cwd(), filePath);
@@ -85,7 +94,10 @@ function shouldIncludeFile(filePath: string, includePatterns: string[]): boolean
 }
 
 /**
- * Recursively find all files in a directory that match the given patterns
+ * Recursively finds all files in a directory that match the given patterns
+ * @param {string} dir - The directory to search in
+ * @param {AnalysisConfig} config - Configuration for file analysis
+ * @returns {string[]} Array of file paths that match the patterns
  */
 function findFiles(dir: string, config: AnalysisConfig): string[] {
   if (!fs.existsSync(dir)) {
@@ -120,7 +132,9 @@ function findFiles(dir: string, config: AnalysisConfig): string[] {
 }
 
 /**
- * Read a file and return its contents
+ * Reads and returns the contents of a file
+ * @param {string} filePath - The path to the file
+ * @returns {string} The contents of the file
  */
 function readFileContent(filePath: string): string {
   try {
@@ -132,7 +146,9 @@ function readFileContent(filePath: string): string {
 }
 
 /**
- * Group files by type for more focused analysis
+ * Groups files by their type for more focused analysis
+ * @param {string[]} files - Array of file paths
+ * @returns {Record<string, string[]>} Object mapping file types to arrays of file paths
  */
 function groupFilesByType(files: string[]): Record<string, string[]> {
   const groups: Record<string, string[]> = {
@@ -172,7 +188,13 @@ function groupFilesByType(files: string[]): Record<string, string[]> {
 }
 
 /**
- * Analyze a group of files
+ * Analyzes a group of files for performance issues
+ * @param {string} groupName - The name of the file group (e.g., 'react', 'vue')
+ * @param {string[]} files - Array of file paths to analyze
+ * @param {AIModel} model - The AI model instance for analysis
+ * @param {AnalysisConfig & GlobalConfig} config - Configuration for analysis
+ * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
+ * @returns {Promise<{ critical: string[], warnings: string[], suggestions: string[], fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> }>} Analysis results
  */
 async function analyzeFileGroup(
   groupName: string,
@@ -426,7 +448,12 @@ Focus on these performance aspects:
 }
 
 /**
- * Process files in batches with prioritization
+ * Processes files in batches for analysis
+ * @param {string[]} files - Array of file paths to analyze
+ * @param {AnalysisConfig & GlobalConfig} config - Configuration for analysis
+ * @param {AIModel} model - The AI model instance for analysis
+ * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
+ * @returns {Promise<CodeAnalysisResult>} Combined analysis results
  */
 async function processBatchedFiles(
   files: string[],
@@ -516,7 +543,9 @@ async function processBatchedFiles(
 }
 
 /**
- * Analyze the entire codebase for performance issues
+ * Analyzes the entire codebase for performance issues
+ * @param {AnalysisConfig & { lighthouseContext?: { metrics: string, analysis: string }, ai?: AIModelConfig } & GlobalConfig} config - Configuration for codebase analysis
+ * @returns {Promise<CodeAnalysisResult>} Complete analysis results including critical issues, warnings, and suggestions
  */
 export async function analyzeCodebase(config: AnalysisConfig & {
   lighthouseContext?: {

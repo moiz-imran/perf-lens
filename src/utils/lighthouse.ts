@@ -36,6 +36,10 @@ interface LighthouseAudit {
 
 const COMMON_DEV_PORTS = [3000, 5173, 8080, 4321, 4000];
 
+/**
+ * Searches for a development server port in package.json scripts
+ * @returns {Promise<number | null>} The port number if found, null otherwise
+ */
 async function findPortInPackageJson(): Promise<number | null> {
   try {
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
@@ -61,6 +65,11 @@ async function findPortInPackageJson(): Promise<number | null> {
   return null;
 }
 
+/**
+ * Checks if a port is accessible on localhost
+ * @param {number} port - The port number to check
+ * @returns {Promise<boolean>} True if the port is accessible, false otherwise
+ */
 async function checkPort(port: number): Promise<boolean> {
   try {
     await axios.get(`http://localhost:${port}`, { timeout: 1000 });
@@ -73,6 +82,10 @@ async function checkPort(port: number): Promise<boolean> {
   }
 }
 
+/**
+ * Attempts to find a running development server by checking common ports and package.json
+ * @returns {Promise<number | null>} The port number if found, null if no server is detected
+ */
 async function findDevServer(): Promise<number | null> {
   const spinner = ora('Detecting development server...').start();
 
@@ -140,7 +153,11 @@ async function findDevServer(): Promise<number | null> {
 }
 
 /**
- * Format Lighthouse metrics into a readable report
+ * Formats Lighthouse performance metrics into a human-readable report
+ * @param {Result} report - The Lighthouse result object
+ * @param {BundleThresholds} [bundleThresholds] - Optional thresholds for bundle sizes
+ * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
+ * @returns {string} Formatted report string
  */
 function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds): string {
   const metrics = report.audits as Record<string, LighthouseAudit>;
@@ -379,7 +396,12 @@ function formatLighthouseReport(report: Result, bundleThresholds?: BundleThresho
   return output;
 }
 
-// Create a separate function for console output with colors
+/**
+ * Formats Lighthouse results for console output
+ * @param {Result} report - The Lighthouse result object
+ * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
+ * @returns {string} Formatted console output string
+ */
 function formatConsoleOutput(report: Result, performanceThresholds?: PerformanceThresholds): string {
   const metrics = report.audits as Record<string, LighthouseAudit>;
   const score = (report.categories.performance?.score || 0) * 100;
@@ -518,7 +540,11 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
 }
 
 /**
- * Analyze Lighthouse report with AI
+ * Analyzes Lighthouse report using AI to provide insights and recommendations
+ * @param {Result} report - The Lighthouse result object
+ * @param {AIModel} model - The AI model instance for analysis
+ * @param {boolean} [verbose] - Whether to enable verbose output
+ * @returns {Promise<string>} AI-generated analysis of the report
  */
 async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?: boolean): Promise<string> {
   const spinner = ora('Analyzing Lighthouse results...').start();
@@ -704,6 +730,11 @@ Implement server-side caching and optimize database queries.
   return analysisResults.map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`).join('\n\n');
 }
 
+/**
+ * Runs Lighthouse performance analysis on the development server
+ * @param {LighthouseConfig & { bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds, ai?: AIModelConfig } & GlobalConfig} config - Configuration options for Lighthouse analysis
+ * @returns {Promise<{ metrics: string, report: string, analysis: string, fullReport: Result }>} Object containing formatted metrics, report, AI analysis, and full Lighthouse result
+ */
 export async function runLighthouse(
   config?: LighthouseConfig & {
     bundleThresholds?: BundleThresholds,
