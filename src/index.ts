@@ -151,10 +151,8 @@ program
       }
 
       // Step 1: Run Lighthouse Analysis
-      const mainSpinner = ora('Running Lighthouse audit...').start();
       let lhResults;
       try {
-        mainSpinner.stop();
         lhResults = await runLighthouse({
           ...config.lighthouse,
           bundleThresholds: config.bundleThresholds,
@@ -162,11 +160,6 @@ program
           verbose: config.verbose,
           ai: config.ai
         });
-
-        if (config.verbose) {
-          // Print metrics to console
-          console.log(lhResults.consoleOutput);
-        }
 
         // Step 2: Code analysis with Lighthouse context
         console.log('\n' + chalk.blue.bold('🧠 Code Analysis'));
@@ -258,7 +251,6 @@ program
           process.exit(1);
         }
       } catch (lhError) {
-        if (mainSpinner) mainSpinner.fail('Lighthouse audit failed');
         if (lhError instanceof Error && lhError.message.includes('No development server detected')) {
           console.log(lhError.message);
           process.exit(1);

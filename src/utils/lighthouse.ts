@@ -520,7 +520,7 @@ function formatConsoleOutput(report: Result, performanceThresholds?: Performance
 /**
  * Analyze Lighthouse report with AI
  */
-async function analyzeLighthouseReport(report: Result, model: AIModel): Promise<string> {
+async function analyzeLighthouseReport(report: Result, model: AIModel, verbose?: boolean): Promise<string> {
   const spinner = ora('Analyzing Lighthouse results...').start();
 
   // Split analysis into focused sections
@@ -656,7 +656,15 @@ Implement server-side caching and optimize database queries.
 
     try {
       const systemPrompt = "You are a performance optimization expert specializing in Lighthouse performance analysis. Focus on providing actionable insights based on the data provided.";
-      const response = await model.generateSuggestions(prompt, systemPrompt);
+      const response = await model.generateSuggestions(prompt, { systemPrompt, onChunk: (chunk, firstChunk) => {
+        if (verbose) {
+          if (firstChunk) {
+            spinner.stop();
+            console.log(`\n# ${section.name}\n\n`);
+          }
+          process.stdout.write(chunk);
+        }
+      }});
 
       if (!response || response.trim() === '') {
         console.error(`Warning: Empty response received for ${section.name}`);
@@ -706,7 +714,6 @@ export async function runLighthouse(
   metrics: string;
   report: string;
   analysis: string;
-  consoleOutput: string;
   fullReport: Result;
 }> {
   // Check for running dev server
@@ -785,6 +792,8 @@ export async function runLighthouse(
         console.log(chalk.blue(`\nRunning Lighthouse on http://localhost:${port} (Attempt ${retryCount + 1}/${maxRetries})`));
       }
 
+      const spinner = ora('Running Lighthouse audit...').start();
+
       const runnerResult = await Promise.race([
         lighthouse(`http://localhost:${port}`, options),
         new Promise((_, reject) =>
@@ -793,15 +802,22 @@ export async function runLighthouse(
       ]) as { lhr: Result };
 
       if (!runnerResult?.lhr) {
+        spinner.fail('Lighthouse audit failed');
         throw new Error('Failed to get Lighthouse results');
       }
 
       const report = runnerResult.lhr;
-      await chrome.kill();
+      spinner.succeed('Lighthouse audit complete');
+      chrome.kill();
 
       const formattedReport = formatLighthouseReport(report, config?.bundleThresholds, config?.performanceThresholds);
-      const consoleOutput = formatConsoleOutput(report, config?.performanceThresholds);
-      const analysis = await analyzeLighthouseReport(report, model);
+
+      if (config?.verbose) {
+        // Print metrics to console
+        console.log(formatConsoleOutput(report, config?.performanceThresholds));
+      }
+
+      const analysis = await analyzeLighthouseReport(report, model, config?.verbose);
 
       const score = (report.categories.performance?.score || 0) * 100;
       const metrics = report.audits;
@@ -815,7 +831,6 @@ export async function runLighthouse(
         metrics: metricsString,
         report: formattedReport,
         analysis: analysis,
-        consoleOutput: consoleOutput,
         fullReport: report
       };
     } catch (error) {

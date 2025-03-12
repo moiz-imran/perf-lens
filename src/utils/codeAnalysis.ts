@@ -329,7 +329,7 @@ Focus on these performance aspects:
 
   try {
     const systemPrompt = "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.";
-    const analysisText = await model.generateSuggestions(prompt, systemPrompt);
+    const analysisText = await model.generateSuggestions(prompt, { systemPrompt });
 
     // Parse issues with improved regex patterns that validate line numbers
     const parseIssues = (text: string, symbol: string): string[] => {

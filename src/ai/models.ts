@@ -3,8 +3,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIModelConfig } from '../types/config.js';
 
+type generationOptions = {
+  systemPrompt?: string;
+  onChunk?: (chunk: string, firstChunk?: boolean) => void
+}
+
 export interface AIModel {
-  generateSuggestions(prompt: string, systemPrompt?: string): Promise<string>;
+  generateSuggestions(prompt: string, options?: generationOptions): Promise<string>;
   getConfig(): AIModelConfig;
 }
 
@@ -19,14 +24,14 @@ export class OpenAIModel implements AIModel {
     });
   }
 
-  async generateSuggestions(prompt: string, systemPrompt?: string): Promise<string> {
+  async generateSuggestions(prompt: string, options?: generationOptions): Promise<string> {
     const isReasoningModel = /^o/.test(this.config.model);
     const stream = await this.client.chat.completions.create({
       model: this.config.model,
       messages: [
         {
           role: "system",
-          content: systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
+          content: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
         },
         { role: 'user', content: prompt }
       ],
@@ -38,7 +43,9 @@ export class OpenAIModel implements AIModel {
     let fullResponse = '';
     for await (const chunk of stream) {
       if (chunk.choices[0]?.delta?.content) {
-        fullResponse += chunk.choices[0].delta.content;
+        const content = chunk.choices[0].delta.content;
+        if (options?.onChunk) options.onChunk(content, fullResponse.length === 0);
+        fullResponse += content;
       }
     }
 
@@ -61,10 +68,10 @@ export class AnthropicModel implements AIModel {
     });
   }
 
-  async generateSuggestions(prompt: string, systemPrompt?: string): Promise<string> {
+  async generateSuggestions(prompt: string, options?: generationOptions): Promise<string> {
     const stream = await this.client.messages.create({
       model: this.config.model,
-      system: systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.",
+      system: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.",
       messages: [{ role: 'user', content: prompt }],
       temperature: this.config.temperature || 0.2,
       max_tokens: this.config.maxTokens || 4096, // Anthropic's max tokens older models
@@ -74,7 +81,9 @@ export class AnthropicModel implements AIModel {
     let fullResponse = '';
     for await (const chunk of stream) {
       if (chunk.type === 'content_block_delta' && 'text' in chunk.delta) {
-        fullResponse += chunk.delta.text;
+        const text = chunk.delta.text;
+        if (options?.onChunk) options.onChunk(text, fullResponse.length === 0);
+        fullResponse += text;
       }
     }
 
@@ -97,14 +106,14 @@ export class GeminiModel implements AIModel {
     );
   }
 
-  async generateSuggestions(prompt: string, systemPrompt?: string): Promise<string> {
+  async generateSuggestions(prompt: string, options?: generationOptions): Promise<string> {
     const model = this.client.getGenerativeModel({
       model: this.config.model,
       generationConfig: {
         temperature: this.config.temperature || 0.2,
         maxOutputTokens: this.config.maxTokens,
       },
-      systemInstruction: systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
+      systemInstruction: options?.systemPrompt || "You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see."
     });
 
     const result = await model.generateContentStream({
@@ -116,7 +125,8 @@ export class GeminiModel implements AIModel {
     let fullResponse = '';
     for await (const chunk of result.stream) {
       if (chunk.text) {
-        fullResponse += chunk.text;
+        if (options?.onChunk) options.onChunk(chunk.text(), fullResponse.length === 0);
+        fullResponse += chunk.text();
       }
     }
 
