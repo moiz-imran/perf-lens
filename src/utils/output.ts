@@ -277,6 +277,75 @@ export function generateHtmlReport(data: PerformanceReport): string {
       }
     `;
 
+  const tabStyles = `
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        border-bottom: 2px solid var(--border);
+        padding-bottom: 0;
+        position: sticky;
+        top: 0;
+        background: var(--background);
+        z-index: 100;
+        padding: 1rem 0;
+      }
+
+      .tab {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 500;
+        color: var(--text-light);
+        background: transparent;
+        border: none;
+        transition: all 0.2s;
+        position: relative;
+      }
+
+      .tab:hover {
+        color: var(--primary);
+        background: rgba(37, 99, 235, 0.1);
+      }
+
+      .tab.active {
+        color: var(--primary);
+        background: rgba(37, 99, 235, 0.1);
+      }
+
+      .tab-content {
+        display: none;
+        animation: fadeIn 0.3s ease-in-out;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .tab-indicator {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.5rem;
+        height: 1.5rem;
+        padding: 0 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+        color: white;
+      }
+
+      .tab-indicator.critical { background: var(--critical); }
+      .tab-indicator.warning { background: var(--warning); }
+      .tab-indicator.suggestion { background: var(--suggestion); }
+    `;
+
   const updatedSummaryCardStyles = `
       .summary-card {
         flex: 1;
@@ -368,233 +437,233 @@ export function generateHtmlReport(data: PerformanceReport): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Performance Analysis Report</title>
 
-    <style>
-      ${updatedCssVariables}
+  <style>
+    ${updatedCssVariables}
+    ${tabStyles}
 
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-        line-height: 1.6;
-        color: var(--text);
-        background: var(--background);
-      }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--background);
+    }
 
-      h5 {
-        font-size: 1rem;
-      }
+    h5 {
+      font-size: 1rem;
+    }
 
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem;
-      }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
 
-      .header {
-        text-align: center;
-        margin-bottom: 3rem;
-        padding: 2rem;
-        background: var(--card-bg);
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-      }
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding: 2rem;
+      background: var(--card-bg);
+      border-radius: 1rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
 
-      .metadata {
-        margin-top: 1rem;
-        color: var(--text-light);
-        font-size: 0.9rem;
-      }
+    .metadata {
+      margin-top: 1rem;
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
 
-      .metadata p {
-        margin: 0.25rem 0;
-      }
+    .metadata p {
+      margin: 0.25rem 0;
+    }
 
-      h1 {
-        color: var(--primary);
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-      }
+    h1 {
+      color: var(--primary);
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
 
-      h2 {
-        color: var(--text);
-        font-size: 1.8rem;
-        margin: 2rem 0 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
+    h2 {
+      color: var(--text);
+      font-size: 1.8rem;
+      margin: 2rem 0 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
 
-      h3 {
-        color: var(--text);
-        font-size: 1.4rem;
-        margin: 1.5rem 0 1rem;
-        border-bottom: 2px solid var(--border);
-        padding-bottom: 0.5rem;
-      }
+    h3 {
+      color: var(--text);
+      font-size: 1.4rem;
+      margin: 1.5rem 0 1rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
 
-      h4 {
-        color: var(--text);
-        font-size: 1.2rem;
-        margin: 1.2rem 0 0.8rem;
-      }
+    h4 {
+      color: var(--text);
+      font-size: 1.2rem;
+      margin: 1.2rem 0 0.8rem;
+    }
 
-      p {
-        margin-bottom: 1rem;
-        line-height: 1.8;
-      }
+    p {
+      margin-bottom: 1rem;
+      line-height: 1.8;
+    }
 
-      ul {
-        margin: 1rem 0;
-        padding-left: 2rem;
-      }
+    ul {
+      margin: 1rem 0;
+      padding-left: 2rem;
+    }
 
-      li {
-        margin-bottom: 0.5rem;
-      }
+    li {
+      margin-bottom: 0.5rem;
+    }
 
-      ${updatedCodeStyles}
+    ${updatedCodeStyles}
 
-      .card {
-        background: white;
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-      }
+    .card {
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    }
 
-      .metrics {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1rem;
-        margin-bottom: 2rem;
-      }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
 
-      .metric-card {
-        background: var(--card-bg);
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-      }
+    .metric-card {
+      background: var(--card-bg);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    }
 
-      .metric-title {
-        color: var(--text);
-        font-size: 0.9rem;
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-      }
+    .metric-title {
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
 
-      .metric-value {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: var(--primary);
-      }
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
 
-      .issue {
-        border-left: 4px solid transparent;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        background: white;
-        border-radius: 0 0.5rem 0.5rem 0;
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-      }
+    .issue {
+      border-left: 4px solid transparent;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: white;
+      border-radius: 0 0.5rem 0.5rem 0;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    }
 
-      .issue.critical {
-        border-left-color: var(--critical);
-      }
+    .issue.critical {
+      border-left-color: var(--critical);
+    }
 
-      .issue.warning {
-        border-left-color: var(--warning);
-      }
+    .issue.warning {
+      border-left-color: var(--warning);
+    }
 
-      .issue.suggestion {
-        border-left-color: var(--suggestion);
-      }
+    .issue.suggestion {
+      border-left-color: var(--suggestion);
+    }
 
-      .issue-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-      }
+    .issue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
 
-      .issue-title {
-        font-weight: 600;
-      }
+    .issue-title {
+      font-weight: 600;
+    }
 
-      .issue-path {
-        font-family: monospace;
-        color: var(--text-light);
-        font-size: 0.9rem;
-      }
+    .issue-path {
+      font-family: monospace;
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
 
-      .resource-list {
-        list-style: none;
-      }
+    .resource-list {
+      list-style: none;
+    }
 
-      .resource-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--border);
-      }
+    .resource-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
 
-      .resource-item:last-child {
-        border-bottom: none;
-      }
+    .resource-item:last-child {
+      border-bottom: none;
+    }
 
-      .resource-url {
-        color: var(--text-light);
-        font-size: 0.9rem;
-        word-break: break-all;
-      }
+    .resource-url {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      word-break: break-all;
+    }
 
-      .resource-size {
-        color: var(--primary);
-        font-weight: 500;
-        white-space: nowrap;
-        margin-left: 1rem;
-      }
+    .resource-size {
+      color: var(--primary);
+      font-weight: 500;
+      white-space: nowrap;
+      margin-left: 1rem;
+    }
 
-      .summary {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 2rem;
-      }
+    .summary {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
 
-      .summary-card {
-        flex: 1;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
+    .summary-card {
+      flex: 1;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-      .summary-card.critical { background: var(--critical); }
-      .summary-card.warning { background: var(--warning); }
-      .summary-card.suggestion { background: var(--suggestion); }
+    .summary-card.critical { background: var(--critical); }
+    .summary-card.warning { background: var(--warning); }
+    .summary-card.suggestion { background: var(--suggestion); }
 
-      .summary-number {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-      }
+    .summary-number {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
 
-      .summary-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-      }
+    .summary-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
 
-      ${updatedSummaryCardStyles}
+    ${updatedSummaryCardStyles}
 
-      ${updatedListStyles}
-    </style>
-
+    ${updatedListStyles}
+  </style>
 </head>
 <body>
   <div class="container">
@@ -626,88 +695,155 @@ export function generateHtmlReport(data: PerformanceReport): string {
       </div>
     </div>
 
-    <h2>🌟 Lighthouse Performance Report</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">📊 Overview</button>
+      <button class="tab" data-tab="lighthouse">
+        🌟 Lighthouse
+        ${data.lighthouse.metrics ? '<span class="tab-indicator suggestion">1</span>' : ''}
+      </button>
+      <button class="tab" data-tab="code-analysis">
+        🧠 Code Analysis
+        ${
+          data.codeAnalysis.critical.length +
+          data.codeAnalysis.warnings.length +
+          data.codeAnalysis.suggestions.length > 0
+            ? `<span class="tab-indicator ${
+                data.codeAnalysis.critical.length > 0
+                  ? 'critical'
+                  : data.codeAnalysis.warnings.length > 0
+                  ? 'warning'
+                  : 'suggestion'
+              }">${
+                data.codeAnalysis.critical.length +
+                data.codeAnalysis.warnings.length +
+                data.codeAnalysis.suggestions.length
+              }</span>`
+            : ''
+        }
+      </button>
+    </div>
 
-    <div class="metrics">
-      ${data.lighthouse.metrics
-        .split('\n')
-        .map(line => {
-          if (!line.trim()) return '';
-          const [title, value] = line.split(':').map(s => s.trim());
-          if (!title || !value) return '';
-          return `
-          <div class="metric-card">
-            <div class="metric-title">${title}</div>
-            <div class="metric-value">${formatMetricValue(value)}</div>
+    <div class="tab-content active" id="overview">
+      <div class="metrics">
+        ${data.lighthouse.metrics
+          .split('\n')
+          .map(line => {
+            if (!line.trim()) return '';
+            const [title, value] = line.split(':').map(s => s.trim());
+            if (!title || !value) return '';
+            return `
+            <div class="metric-card">
+              <div class="metric-title">${title}</div>
+              <div class="metric-value">${formatMetricValue(value)}</div>
+            </div>
+          `;
+          })
+          .join('')}
+      </div>
+
+      <div class="card">
+        <h3>Quick Summary</h3>
+        <p>This report provides a comprehensive analysis of your application's performance across multiple dimensions:</p>
+        <ul>
+          <li><strong>Lighthouse Analysis:</strong> Core web vitals and performance metrics</li>
+          <li><strong>Code Analysis:</strong> Static analysis of your codebase for performance optimizations</li>
+        </ul>
+        ${
+          data.codeAnalysis.critical.length > 0
+            ? `<div class="alert critical">
+                <h4>🚨 Critical Issues Detected</h4>
+                <p>There are ${data.codeAnalysis.critical.length} critical issues that need immediate attention.</p>
+              </div>`
+            : ''
+        }
+      </div>
+    </div>
+
+    <div class="tab-content" id="lighthouse">
+      <div class="card">
+        <h3>Detailed Report</h3>
+        ${formatMarkdownToHtml(data.lighthouse.report)}
+      </div>
+
+      <div class="card">
+        <h3>Analysis</h3>
+        ${formatMarkdownToHtml(data.lighthouse.analysis)}
+      </div>
+    </div>
+
+    <div class="tab-content" id="code-analysis">
+      ${
+        data.codeAnalysis.critical.length > 0
+          ? `
+        <h3>Critical Issues</h3>
+        ${data.codeAnalysis.critical
+          .map(
+            issue => `
+          <div class="issue critical">
+            ${formatIssue(issue)}
           </div>
-        `;
-        })
-        .join('')}
-    </div>
-
-    <div class="card">
-      <h3>Detailed Report</h3>
-      ${formatMarkdownToHtml(data.lighthouse.report)}
-    </div>
-
-    <div class="card">
-      <h3>Analysis</h3>
-      ${formatMarkdownToHtml(data.lighthouse.analysis)}
-    </div>
-
-    <h2>🧠 Code Analysis</h2>
-
-    ${
-      data.codeAnalysis.critical.length > 0
-        ? `
-      <h3>Critical Issues</h3>
-      ${data.codeAnalysis.critical
-        .map(
-          issue => `
-        <div class="issue critical">
-          ${formatIssue(issue)}
-        </div>
+        `
+          )
+          .join('\n')}
       `
-        )
-        .join('\n')}
-    `
-        : ''
-    }
+          : ''
+      }
 
-    ${
-      data.codeAnalysis.warnings.length > 0
-        ? `
-      <h3>Warnings</h3>
-      ${data.codeAnalysis.warnings
-        .map(
-          issue => `
-        <div class="issue warning">
-          ${formatIssue(issue)}
-        </div>
+      ${
+        data.codeAnalysis.warnings.length > 0
+          ? `
+        <h3>Warnings</h3>
+        ${data.codeAnalysis.warnings
+          .map(
+            issue => `
+          <div class="issue warning">
+            ${formatIssue(issue)}
+          </div>
+        `
+          )
+          .join('\n')}
       `
-        )
-        .join('\n')}
-    `
-        : ''
-    }
+          : ''
+      }
 
-    ${
-      data.codeAnalysis.suggestions.length > 0
-        ? `
-      <h3>Suggestions</h3>
-      ${data.codeAnalysis.suggestions
-        .map(
-          issue => `
-        <div class="issue suggestion">
-          ${formatIssue(issue)}
-        </div>
+      ${
+        data.codeAnalysis.suggestions.length > 0
+          ? `
+        <h3>Suggestions</h3>
+        ${data.codeAnalysis.suggestions
+          .map(
+            issue => `
+          <div class="issue suggestion">
+            ${formatIssue(issue)}
+          </div>
+        `
+          )
+          .join('\n')}
       `
-        )
-        .join('\n')}
-    `
-        : ''
-    }
+          : ''
+      }
+    </div>
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('.tab');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          // Remove active class from all tabs and contents
+          tabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+
+          // Add active class to clicked tab and corresponding content
+          tab.classList.add('active');
+          const tabId = tab.getAttribute('data-tab');
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+    });
+  </script>
 </body>
 </html>`;
 }
