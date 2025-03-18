@@ -637,7 +637,7 @@ async function analyzeLighthouseReport(
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
 
-    const basePrompt = await promptManager.getPromptAsync(PROMPT_KEYS.LIGHTHOUSE_ANALYSIS);
+    const basePrompt = promptManager.getPrompt(PROMPT_KEYS.LIGHTHOUSE_ANALYSIS);
     const prompt = `${basePrompt}
 
 Please analyze this section of the Lighthouse performance report and provide detailed insights and recommendations.
@@ -652,7 +652,7 @@ Metrics Data:
 ${JSON.stringify(section.data.metrics, null, 2)}`;
 
     try {
-      const systemPrompt = await promptManager.getPromptAsync(PROMPT_KEYS.PERFORMANCE_EXPERT);
+      const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
       const response = await model.generateSuggestions(prompt, {
         systemPrompt,
         onChunk: (chunk, firstChunk) => {

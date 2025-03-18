@@ -69,7 +69,6 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.758.0",
     "@eslint/js": "^9.22.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
