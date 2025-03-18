@@ -1,4 +1,4 @@
-import { DEFAULT_PROMPTS, type PromptKey } from './promptConfig.js';
+import { getPromptTemplateAsync, type PromptKey, PROMPT_KEYS } from './promptConfig.js';
 
 /**
  * Manages system prompts for AI interactions
@@ -24,16 +24,19 @@ export class PromptManager {
   }
 
   /**
-   * Loads prompts from the default configuration
+   * Loads prompts asynchronously from S3 or local files
    */
-  private loadPrompts(): void {
+  private async loadPromptsAsync(): Promise<void> {
     if (this.initialized) return;
 
-    // Load default prompts
-    Object.entries(DEFAULT_PROMPTS).forEach(([key, content]) => {
-      this.prompts.set(key as PromptKey, content);
+    // Load prompts from S3 or local files
+    const promptKeys = Object.values(PROMPT_KEYS) as PromptKey[];
+    const loadPromises = promptKeys.map(async key => {
+      const content = await getPromptTemplateAsync(key);
+      this.prompts.set(key, content);
     });
 
+    await Promise.all(loadPromises);
     this.initialized = true;
   }
 
@@ -43,9 +46,9 @@ export class PromptManager {
    * @returns The prompt content
    * @throws Error if the prompt is not found
    */
-  public getPrompt(key: PromptKey): string {
+  public async getPromptAsync(key: PromptKey): Promise<string> {
     if (!this.initialized) {
-      this.loadPrompts();
+      await this.loadPromptsAsync();
     }
 
     const prompt = this.prompts.get(key);
@@ -63,7 +66,7 @@ export class PromptManager {
    */
   public updatePrompt(key: PromptKey, content: string): void {
     if (!this.initialized) {
-      this.loadPrompts();
+      this.loadPromptsAsync();
     }
 
     this.prompts.set(key, content);
@@ -76,7 +79,7 @@ export class PromptManager {
    */
   public hasPrompt(key: PromptKey): boolean {
     if (!this.initialized) {
-      this.loadPrompts();
+      this.loadPromptsAsync();
     }
     return this.prompts.has(key);
   }
@@ -87,7 +90,7 @@ export class PromptManager {
    */
   public getPromptKeys(): PromptKey[] {
     if (!this.initialized) {
-      this.loadPrompts();
+      this.loadPromptsAsync();
     }
     return Array.from(this.prompts.keys());
   }

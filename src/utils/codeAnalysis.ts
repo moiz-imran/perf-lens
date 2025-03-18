@@ -272,7 +272,7 @@ async function analyzeFileGroup(
 
   // Create analysis prompt
   const promptManager = PromptManager.getInstance();
-  const basePrompt = promptManager.getPrompt(PROMPT_KEYS.CODE_ANALYSIS);
+  const basePrompt = await promptManager.getPromptAsync(PROMPT_KEYS.CODE_ANALYSIS);
   const prompt = `${basePrompt}
 
 Here are the ONLY files you can reference in your analysis:
@@ -315,7 +315,7 @@ Use the above Lighthouse insights to guide your code analysis. Look for specific
 }`;
 
   try {
-    const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
+    const systemPrompt = await promptManager.getPromptAsync(PROMPT_KEYS.PERFORMANCE_EXPERT);
     const analysisText = await model.generateSuggestions(prompt, { systemPrompt });
 
     // Parse issues with improved regex patterns that validate line numbers
