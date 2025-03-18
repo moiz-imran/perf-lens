@@ -14,6 +14,8 @@ import type {
   GlobalConfig,
 } from '../types/config.js';
 import { AIModel } from '../ai/models.js';
+import { PromptManager } from '../prompts/promptManager.js';
+import { PROMPT_KEYS } from '../prompts/promptConfig.js';
 
 // Add type definitions for Lighthouse audit details
 interface AuditItem {
@@ -561,50 +563,71 @@ function formatConsoleOutput(
  * Analyzes Lighthouse report using AI to provide insights and recommendations
  * @param {Result} report - The Lighthouse result object
  * @param {AIModel} model - The AI model instance for analysis
+ * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @param {boolean} [verbose] - Whether to enable verbose output
  * @returns {Promise<string>} AI-generated analysis of the report
  */
 async function analyzeLighthouseReport(
   report: Result,
   model: AIModel,
+  performanceThresholds?: PerformanceThresholds,
   verbose?: boolean
 ): Promise<string> {
   const spinner = ora('Analyzing Lighthouse results...').start();
+  const promptManager = PromptManager.getInstance();
 
   // Split analysis into focused sections
   const sections = [
     {
       name: 'Core Web Vitals',
       data: {
-        'first-contentful-paint': report.audits['first-contentful-paint'],
-        'largest-contentful-paint': report.audits['largest-contentful-paint'],
-        'total-blocking-time': report.audits['total-blocking-time'],
-        'cumulative-layout-shift': report.audits['cumulative-layout-shift'],
-        'speed-index': report.audits['speed-index'],
-        interactive: report.audits['interactive'],
+        metrics: {
+          'first-contentful-paint': report.audits['first-contentful-paint'],
+          'largest-contentful-paint': report.audits['largest-contentful-paint'],
+          'total-blocking-time': report.audits['total-blocking-time'],
+          'cumulative-layout-shift': report.audits['cumulative-layout-shift'],
+          'speed-index': report.audits['speed-index'],
+          interactive: report.audits['interactive'],
+        },
+        thresholds: {
+          fcp: performanceThresholds?.fcp || 1800,
+          lcp: performanceThresholds?.lcp || 2500,
+          tbt: performanceThresholds?.tbt || 200,
+          cls: performanceThresholds?.cls || 0.1,
+          speedIndex: performanceThresholds?.speedIndex || 3400,
+          tti: performanceThresholds?.tti || 3800,
+          fid: performanceThresholds?.fid || 100,
+          performance: performanceThresholds?.performance || 90,
+        },
       },
     },
     {
       name: 'Performance Opportunities',
       data: {
-        'render-blocking-resources': report.audits['render-blocking-resources'],
-        'unused-javascript': report.audits['unused-javascript'],
-        'unused-css-rules': report.audits['unused-css-rules'],
-        'offscreen-images': report.audits['offscreen-images'],
-        'unminified-javascript': report.audits['unminified-javascript'],
-        'unminified-css': report.audits['unminified-css'],
-        'modern-image-formats': report.audits['modern-image-formats'],
+        metrics: {
+          'render-blocking-resources': report.audits['render-blocking-resources'],
+          'unused-javascript': report.audits['unused-javascript'],
+          'unused-css-rules': report.audits['unused-css-rules'],
+          'offscreen-images': report.audits['offscreen-images'],
+          'unminified-javascript': report.audits['unminified-javascript'],
+          'unminified-css': report.audits['unminified-css'],
+          'modern-image-formats': report.audits['modern-image-formats'],
+        },
+        thresholds: performanceThresholds,
       },
     },
     {
       name: 'Diagnostics',
       data: {
-        'mainthread-work-breakdown': report.audits['mainthread-work-breakdown'],
-        'dom-size': report.audits['dom-size'],
-        'critical-request-chains': report.audits['critical-request-chains'],
-        'network-requests': report.audits['network-requests'],
-        'network-rtt': report.audits['network-rtt'],
-        'network-server-latency': report.audits['network-server-latency'],
+        metrics: {
+          'mainthread-work-breakdown': report.audits['mainthread-work-breakdown'],
+          'dom-size': report.audits['dom-size'],
+          'critical-request-chains': report.audits['critical-request-chains'],
+          'network-requests': report.audits['network-requests'],
+          'network-rtt': report.audits['network-rtt'],
+          'network-server-latency': report.audits['network-server-latency'],
+        },
+        thresholds: performanceThresholds,
       },
     },
   ];
@@ -614,97 +637,22 @@ async function analyzeLighthouseReport(
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
 
-    const prompt = `You are a performance optimization expert specializing in frontend web development.
+    const basePrompt = promptManager.getPrompt(PROMPT_KEYS.LIGHTHOUSE_ANALYSIS);
+    const prompt = `${basePrompt}
+
 Please analyze this section of the Lighthouse performance report and provide detailed insights and recommendations.
 
 Section: ${section.name}
 Performance Score: ${(report.categories.performance?.score || 0) * 100}%
 
-Data:
-${JSON.stringify(section.data, null, 2)}
+Performance Thresholds:
+${JSON.stringify(section.data.thresholds, null, 2)}
 
-IMPORTANT - You MUST follow these formatting rules:
-
-1. Your response MUST be in Markdown format
-2. Use the following structure for your analysis:
-
-## Key Findings
-
-[List your key findings here, one per bullet point]
-- Finding 1
-- Finding 2
-...
-
-## Impact Analysis
-
-[For each metric, provide:]
-- Metric name
-- Current value
-- Target threshold
-- Impact on user experience
-- Severity (Critical/Warning/Good)
-
-## Recommendations
-
-[For each recommendation:]
-### Recommendation Title
-
-**Priority**: [Critical/High/Medium/Low]
-**Effort**: [Easy/Medium/Hard]
-**Impact**: [High/Medium/Low]
-
-**Problem**:
-[Clear description of the issue]
-
-**Solution**:
-[Detailed solution with code examples if applicable]
-
-**Expected Improvement**:
-[Quantified improvement estimate]
-
-3. NEVER include placeholder text like "[List your key findings here]"
-4. NEVER make assumptions about code you cannot see
-5. Base ALL recommendations on the actual data provided
-6. Use exact values from the data when discussing metrics
-7. Provide specific, actionable recommendations
-8. Include quantifiable improvements whenever possible
-9. Format code examples using triple backticks with language specification
-10. Separate sections with a blank line
-
-Example format:
-
-## Key Findings
-- First Contentful Paint is 2.3s, exceeding the recommended 1.8s threshold
-- Largest Contentful Paint shows poor performance at 4.1s
-
-## Impact Analysis
-- **First Contentful Paint:**
-  - **Current value:** 2.3s
-  - **Target threshold:** 1.8s
-  - **Impact:** Users perceive slower initial page load
-  - **Severity:** Warning
-
-## Recommendations
-
-### Optimize First Contentful Paint
-
-**Priority**: High
-**Effort**: Medium
-**Impact**: High
-
-**Problem**:
-Server response time of 1.2s contributes significantly to the FCP.
-
-**Solution**:
-Implement server-side caching and optimize database queries.
-
-**Expected Improvement**:
-- FCP reduction by 0.8s
-- 35% improvement in initial render time`;
+Metrics Data:
+${JSON.stringify(section.data.metrics, null, 2)}`;
 
     try {
-      const systemPrompt =
-        'You are a performance optimization expert specializing in Lighthouse performance analysis. Focus on providing actionable insights based on the data provided.';
+      const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
       const response = await model.generateSuggestions(prompt, {
         systemPrompt,
         onChunk: (chunk, firstChunk) => {
@@ -916,7 +864,12 @@ export async function runLighthouse(
         console.log(formatConsoleOutput(report, config?.performanceThresholds));
       }
 
-      const analysis = await analyzeLighthouseReport(report, model, config?.verbose);
+      const analysis = await analyzeLighthouseReport(
+        report,
+        model,
+        config?.performanceThresholds,
+        config?.verbose
+      );
 
       const score = (report.categories.performance?.score || 0) * 100;
       const metrics = report.audits;

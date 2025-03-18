@@ -5,6 +5,8 @@ import ora from 'ora';
 import { createModel } from './ai.js';
 import type { AIModelConfig, AnalysisConfig, GlobalConfig } from '../types/config.js';
 import type { AIModel } from '../ai/models.js';
+import { PromptManager } from '../prompts/promptManager.js';
+import { PROMPT_KEYS } from '../prompts/promptConfig.js';
 
 // Default file patterns to include if none specified
 const DEFAULT_INCLUDE_PATTERNS = [
@@ -269,23 +271,9 @@ async function analyzeFileGroup(
   }
 
   // Create analysis prompt
-  const prompt = `You are a performance optimization expert specializing in frontend web development.
-I need you to analyze the following ${groupName} files for performance issues and optimization opportunities.
-
-${
-  lighthouseContext
-    ? `
-LIGHTHOUSE CONTEXT:
-Performance Metrics:
-${lighthouseContext.metrics}
-
-Analysis:
-${lighthouseContext.analysis}
-
-Use the above Lighthouse insights to guide your code analysis. Look for specific code patterns that might be causing the performance issues identified by Lighthouse.
-`
-    : ''
-}
+  const promptManager = PromptManager.getInstance();
+  const basePrompt = promptManager.getPrompt(PROMPT_KEYS.CODE_ANALYSIS);
+  const prompt = `${basePrompt}
 
 Here are the ONLY files you can reference in your analysis:
 ${filesToAnalyze
@@ -311,69 +299,23 @@ ${lines.map((line, index) => `${index + 1}: ${line}`).join('\n')}
   })
   .join('\n')}
 
-IMPORTANT - You MUST follow these rules:
-1. ONLY reference the files listed above
-2. Line numbers MUST exist in the file (check the line numbers shown above)
-3. When referencing code, include 2-3 lines before and after for context
-4. NEVER mention files or line numbers that don't exist
-5. NEVER make assumptions about code you cannot see
-6. If you're not 100% certain about a performance issue, DO NOT include it
+${
+  lighthouseContext
+    ? `
+LIGHTHOUSE CONTEXT:
+Performance Metrics:
+${lighthouseContext.metrics}
 
-Format your response EXACTLY as follows for each issue:
+Analysis:
+${lighthouseContext.analysis}
 
-[CRITICAL/WARNING/SUGGESTION] <filepath>:<start_line>-<end_line>
-Description: <clear description of the issue>
-Impact: <specific performance impact>
-Code Context:
-\`\`\`
-<exact code from the file>
-\`\`\`
-Solution: <specific, actionable solution with code example>
-Expected Improvement: <quantified improvement estimate based on the actual code>
-
-Example:
-🚨 src/components/Header.tsx:45-48
-Description: Memory leak in useEffect due to missing cleanup of event listener
-Impact: Causes memory usage to grow over time, leading to degraded performance
-Code Context:
-\`\`\`tsx
-useEffect(() => {
-  window.addEventListener('resize', handleResize);
-  // Missing cleanup
-}, []);
-\`\`\`
-Solution: Add cleanup function to useEffect:
-\`\`\`tsx
-useEffect(() => {
-  window.addEventListener('resize', handleResize);
-  return () => window.removeEventListener('resize', handleResize);
-}, []);
-\`\`\`
-Expected Improvement: Prevents memory leak of ~1KB per resize event listener
-
-CRITICAL issues should use 🚨
-WARNING issues should use ⚠️
-SUGGESTION issues should use 💡
-
-Each issue MUST be separated by exactly two newlines.
-The first line of each issue MUST start with one of these emojis followed by a space and the filepath:line-range.
-The filepath MUST be relative to the project root.
-The line range MUST be in the format start-end (e.g., 45-48).
-The Description, Impact, Code Context, Solution, and Expected Improvement sections MUST be on separate lines.
-The Code Context section MUST be wrapped in triple backticks with the language specified.
-
-Focus on these performance aspects:
-- Render performance (unnecessary re-renders, expensive calculations)
-- Bundle size (large dependencies, code splitting opportunities)
-- Memory leaks and inefficient memory usage
-- Network performance (excessive API calls, inefficient data fetching)
-- CSS performance (complex selectors, layout thrashing)
-- JavaScript performance (inefficient algorithms, unnecessary work)
-- Asset optimization (images, fonts, etc.)`;
+Use the above Lighthouse insights to guide your code analysis. Look for specific code patterns that might be causing the performance issues identified by Lighthouse.
+`
+    : ''
+}`;
 
   try {
-    const systemPrompt =
-      'You are a performance optimization expert for frontend web applications. You MUST only reference files and line numbers that actually exist in the provided code. Never make assumptions about code you cannot see.';
+    const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
     const analysisText = await model.generateSuggestions(prompt, { systemPrompt });
 
     // Parse issues with improved regex patterns that validate line numbers
