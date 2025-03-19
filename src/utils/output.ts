@@ -568,14 +568,7 @@ export function generateHtmlReport(data: PerformanceReport): string {
       }
     `;
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Performance Analysis Report</title>
-
-  <style>
+  const styles = `
     ${updatedCssVariables}
     ${tabStyles}
     ${accordionStyles}
@@ -802,6 +795,40 @@ export function generateHtmlReport(data: PerformanceReport): string {
     ${updatedSummaryCardStyles}
 
     ${updatedListStyles}
+
+    .lighthouse-attribution {
+      text-align: center;
+      margin: 20px 0;
+      padding: 10px;
+      border-top: 1px solid #eee;
+      color: #666;
+
+      a {
+        color: #0066cc;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      img {
+        width: 48px;
+        height: 48px;
+        vertical-align: middle;
+      }
+    }
+  `;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Performance Analysis Report</title>
+
+  <style>
+    ${styles}
   </style>
 </head>
 <body>
@@ -1012,6 +1039,11 @@ export function generateHtmlReport(data: PerformanceReport): string {
             </div>
           </div>
         </div>
+      </div>
+      <div class="lighthouse-attribution">
+        <img src="https://developer.chrome.com/static/docs/lighthouse/overview/image/lighthouse-logo.svg" alt="Lighthouse" />
+        Powered by <a href="https://www.google.com/url?q=https://developers.google.com/web/tools/lighthouse&sa=D&source=editors&ust=1742372714584851&usg=AOvVaw0H4et58bVq5T5hpQYr3br5" target="_blank">Lighthouse</a> (v12.4.0)
+        • To run a full Lighthouse report, go <a href="https://www.google.com/url?q=https://developers.google.com/web/tools/lighthouse%23devtools&sa=D&source=editors&ust=1742372714585325&usg=AOvVaw3Y_g-R7icqIAg0laMFq1ol" target="_blank">here</a>.
       </div>
     </div>
 
