@@ -1,0 +1,14 @@
+# Generated files
+CHANGELOG.md
+
+# Build output
+dist/
+build/
+coverage/
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Node modules
+node_modules/
