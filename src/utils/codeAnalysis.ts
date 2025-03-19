@@ -93,7 +93,7 @@ function calculateFilePriority(filePath: string, size: number): number {
 function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
   const relativePath = path.relative(process.cwd(), filePath);
   return ignorePatterns.some(pattern => {
-    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\//g, '\\/'));
+    const regex = new RegExp(pattern.replace(/\\/g, '\\\\').replace(/\*/g, '.*').replace(/\//g, '\\/'));
     return regex.test(relativePath);
   });
 }
@@ -107,7 +107,7 @@ function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
 function shouldIncludeFile(filePath: string, includePatterns: string[]): boolean {
   const relativePath = path.relative(process.cwd(), filePath);
   return includePatterns.some(pattern => {
-    const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\//g, '\\/'));
+    const regex = new RegExp(pattern.replace(/\\/g, '\\\\').replace(/\*/g, '.*').replace(/\//g, '\\/'));
     return regex.test(relativePath);
   });
 }
