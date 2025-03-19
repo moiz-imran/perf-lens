@@ -3,7 +3,7 @@ import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { createModel } from './ai.js';
-import type { AIModelConfig, AnalysisConfig, GlobalConfig } from '../types/config.js';
+import type { AIModelConfig, AnalysisConfig } from '../types/config.js';
 import type { AIModel } from '../ai/models.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { PROMPT_KEYS } from '../prompts/promptConfig.js';
@@ -39,6 +39,21 @@ interface CodeAnalysisResult {
       suggestions: string[];
     }
   >;
+}
+
+interface LighthouseContext {
+  metrics: string;
+  analysis: {
+    coreWebVitals: string;
+    performanceOpportunities: string;
+    diagnostics: string;
+  };
+}
+
+interface CodeAnalysisConfig extends AnalysisConfig {
+  lighthouseContext?: LighthouseContext;
+  ai?: AIModelConfig;
+  verbose?: boolean;
 }
 
 /**
@@ -196,7 +211,7 @@ function groupFilesByType(files: string[]): Record<string, string[]> {
  * @param {string} groupName - The name of the file group (e.g., 'react', 'vue')
  * @param {string[]} files - Array of file paths to analyze
  * @param {AIModel} model - The AI model instance for analysis
- * @param {AnalysisConfig & GlobalConfig} config - Configuration for analysis
+ * @param {CodeAnalysisConfig} config - Configuration for analysis
  * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
  * @returns {Promise<{ critical: string[], warnings: string[], suggestions: string[], fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> }>} Analysis results
  */
@@ -204,8 +219,8 @@ async function analyzeFileGroup(
   groupName: string,
   files: string[],
   model: AIModel,
-  config: AnalysisConfig & GlobalConfig,
-  lighthouseContext?: { metrics: string; analysis: string }
+  config: CodeAnalysisConfig,
+  lighthouseContext?: LighthouseContext
 ): Promise<{
   critical: string[];
   warnings: string[];
@@ -436,16 +451,16 @@ Use the above Lighthouse insights to guide your code analysis. Look for specific
 /**
  * Processes files in batches for analysis
  * @param {string[]} files - Array of file paths to analyze
- * @param {AnalysisConfig & GlobalConfig} config - Configuration for analysis
+ * @param {CodeAnalysisConfig} config - Configuration for analysis
  * @param {AIModel} model - The AI model instance for analysis
  * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
  * @returns {Promise<CodeAnalysisResult>} Combined analysis results
  */
 async function processBatchedFiles(
   files: string[],
-  config: AnalysisConfig & GlobalConfig,
+  config: CodeAnalysisConfig,
   model: AIModel,
-  lighthouseContext?: { metrics: string; analysis: string }
+  lighthouseContext?: LighthouseContext
 ): Promise<CodeAnalysisResult> {
   const result: CodeAnalysisResult = {
     critical: [],
@@ -538,18 +553,10 @@ async function processBatchedFiles(
 
 /**
  * Analyzes the entire codebase for performance issues
- * @param {AnalysisConfig & { lighthouseContext?: { metrics: string, analysis: string }, ai?: AIModelConfig } & GlobalConfig} config - Configuration for codebase analysis
+ * @param {CodeAnalysisConfig} config - Configuration for codebase analysis
  * @returns {Promise<CodeAnalysisResult>} Complete analysis results including critical issues, warnings, and suggestions
  */
-export async function analyzeCodebase(
-  config: AnalysisConfig & {
-    lighthouseContext?: {
-      metrics: string;
-      analysis: string;
-    };
-    ai?: AIModelConfig;
-  } & GlobalConfig
-): Promise<CodeAnalysisResult> {
+export async function analyzeCodebase(config: CodeAnalysisConfig): Promise<CodeAnalysisResult> {
   const spinner = config.verbose ? ora('Finding files to analyze...').start() : null;
 
   // Determine the directory to scan

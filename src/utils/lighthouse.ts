@@ -565,14 +565,18 @@ function formatConsoleOutput(
  * @param {AIModel} model - The AI model instance for analysis
  * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @param {boolean} [verbose] - Whether to enable verbose output
- * @returns {Promise<string>} AI-generated analysis of the report
+ * @returns {Promise<{ coreWebVitals: string, performanceOpportunities: string, diagnostics: string }>} AI-generated analysis of the report
  */
 async function analyzeLighthouseReport(
   report: Result,
   model: AIModel,
   performanceThresholds?: PerformanceThresholds,
   verbose?: boolean
-): Promise<string> {
+): Promise<{
+  coreWebVitals: string;
+  performanceOpportunities: string;
+  diagnostics: string;
+}> {
   const spinner = ora('Analyzing Lighthouse results...').start();
   const promptManager = PromptManager.getInstance();
 
@@ -613,7 +617,6 @@ async function analyzeLighthouseReport(
           'unminified-css': report.audits['unminified-css'],
           'modern-image-formats': report.audits['modern-image-formats'],
         },
-        thresholds: performanceThresholds,
       },
     },
     {
@@ -627,12 +630,15 @@ async function analyzeLighthouseReport(
           'network-rtt': report.audits['network-rtt'],
           'network-server-latency': report.audits['network-server-latency'],
         },
-        thresholds: performanceThresholds,
       },
     },
   ];
 
-  const analysisResults = [];
+  const analysisResults: Record<string, string> = {
+    coreWebVitals: '',
+    performanceOpportunities: '',
+    diagnostics: '',
+  };
 
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
@@ -645,8 +651,12 @@ Please analyze this section of the Lighthouse performance report and provide det
 Section: ${section.name}
 Performance Score: ${(report.categories.performance?.score || 0) * 100}%
 
-Performance Thresholds:
-${JSON.stringify(section.data.thresholds, null, 2)}
+${
+  section.data.thresholds
+    ? `Performance Thresholds:
+      ${JSON.stringify(section.data.thresholds, null, 2)}`
+    : ''
+}
 
 Metrics Data:
 ${JSON.stringify(section.data.metrics, null, 2)}`;
@@ -668,17 +678,23 @@ ${JSON.stringify(section.data.metrics, null, 2)}`;
 
       if (!response || response.trim() === '') {
         console.error(`Warning: Empty response received for ${section.name}`);
-        analysisResults.push({
-          section: section.name,
-          analysis: `No analysis available for ${section.name}. Please check the raw Lighthouse report for details.`,
-        });
+        analysisResults[section.name.toLowerCase().replace(/\s+/g, '')] =
+          `No analysis available for ${section.name}. Please check the raw Lighthouse report for details.`;
         continue;
       }
 
-      analysisResults.push({
-        section: section.name,
-        analysis: response,
-      });
+      // Store the analysis in the corresponding section
+      switch (section.name) {
+        case 'Core Web Vitals':
+          analysisResults.coreWebVitals = response;
+          break;
+        case 'Performance Opportunities':
+          analysisResults.performanceOpportunities = response;
+          break;
+        case 'Diagnostics':
+          analysisResults.diagnostics = response;
+          break;
+      }
     } catch (error) {
       console.error(`Error analyzing ${section.name}:`, error);
       if (error instanceof Error) {
@@ -688,10 +704,8 @@ ${JSON.stringify(section.data.metrics, null, 2)}`;
           stack: error.stack,
         });
       }
-      analysisResults.push({
-        section: section.name,
-        analysis: `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`,
-      });
+      analysisResults[section.name.toLowerCase().replace(/\s+/g, '')] =
+        `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`;
     }
 
     // Add a small delay between API calls to avoid rate limits
@@ -700,10 +714,11 @@ ${JSON.stringify(section.data.metrics, null, 2)}`;
 
   spinner.succeed('Lighthouse analysis complete');
 
-  // Return the section analyses
-  return analysisResults
-    .map(r => `# ${r.section}\n${r.analysis.replace(/^# [^\n]+\n/, '')}`)
-    .join('\n\n');
+  return {
+    coreWebVitals: analysisResults.coreWebVitals,
+    performanceOpportunities: analysisResults.performanceOpportunities,
+    diagnostics: analysisResults.diagnostics,
+  };
 }
 
 /**
@@ -733,7 +748,7 @@ function parseSizeString(size: string): number {
 /**
  * Runs Lighthouse performance analysis on the development server
  * @param {LighthouseConfig & { bundleThresholds?: BundleThresholds, performanceThresholds?: PerformanceThresholds, ai?: AIModelConfig } & GlobalConfig} config - Configuration options for Lighthouse analysis
- * @returns {Promise<{ metrics: string, report: string, analysis: string, fullReport: Result }>} Object containing formatted metrics, report, AI analysis, and full Lighthouse result
+ * @returns {Promise<{ metrics: string, report: string, analysis: { coreWebVitals: string, performanceOpportunities: string, diagnostics: string }, fullReport: Result }>} Object containing formatted metrics, report, AI analysis, and full Lighthouse result
  */
 export async function runLighthouse(
   config?: LighthouseConfig & {
@@ -744,7 +759,11 @@ export async function runLighthouse(
 ): Promise<{
   metrics: string;
   report: string;
-  analysis: string;
+  analysis: {
+    coreWebVitals: string;
+    performanceOpportunities: string;
+    diagnostics: string;
+  };
   fullReport: Result;
 }> {
   // Check for running dev server
@@ -883,7 +902,7 @@ export async function runLighthouse(
       return {
         metrics: metricsString,
         report: formattedReport,
-        analysis: analysis,
+        analysis,
         fullReport: report,
       };
     } catch (error) {

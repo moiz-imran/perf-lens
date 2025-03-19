@@ -7,7 +7,11 @@ interface PerformanceReport {
   lighthouse: {
     metrics: string;
     report: string;
-    analysis: string;
+    analysis: {
+      coreWebVitals: string;
+      performanceOpportunities: string;
+      diagnostics: string;
+    };
   };
   codeAnalysis: {
     critical: string[];
@@ -430,6 +434,140 @@ export function generateHtmlReport(data: PerformanceReport): string {
       }
     `;
 
+  const accordionStyles = `
+      .accordion {
+        margin-bottom: 1rem;
+      }
+
+      .accordion-header {
+        padding: 1rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s;
+      }
+
+      .accordion-header:hover {
+        background: rgba(37, 99, 235, 0.1);
+      }
+
+      .accordion-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .accordion-icon {
+        transition: transform 0.2s;
+      }
+
+      .accordion-content {
+        display: none;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 0.5rem 0.5rem;
+        background: var(--card-bg);
+      }
+
+      .accordion.active > .accordion-header {
+        border-radius: 0.5rem 0.5rem 0 0;
+        background: rgba(37, 99, 235, 0.1);
+
+        .accordion-icon {
+          transform: rotate(180deg);
+        }
+      }
+
+      .accordion.active > .accordion-content {
+        display: block;
+      }
+
+      .expandable-list {
+        position: relative;
+        max-height: 300px;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+      }
+
+      .expandable-list.expanded {
+        max-height: none;
+      }
+
+      .expandable-list:not(.expanded)::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: linear-gradient(transparent, var(--card-bg));
+      }
+
+      .expand-button {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+      }
+
+      .expand-button:hover {
+        opacity: 0.9;
+      }
+
+      .nested-accordions {
+        margin: -1rem;
+      }
+
+      .nested-accordions .accordion {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-top: none;
+      }
+
+      .nested-accordions .accordion:first-child {
+        border-top: 1px solid var(--border);
+        border-top-left-radius: 0.5rem;
+        border-top-right-radius: 0.5rem;
+      }
+
+      .nested-accordions .accordion:last-child {
+        border-bottom-left-radius: 0.5rem;
+        border-bottom-right-radius: 0.5rem;
+      }
+
+      .nested-accordions .accordion-header {
+        background: rgba(37, 99, 235, 0.05);
+        border: none;
+        border-radius: 0;
+        padding-left: 3rem;
+      }
+
+      .nested-accordions .accordion.active .accordion-header {
+        background: rgba(37, 99, 235, 0.1);
+        border-radius: 0;
+      }
+
+      .nested-accordions .accordion-content {
+        border: none;
+        border-radius: 0;
+        padding-left: 3rem;
+
+        h2 {
+          margin-top: 1rem;
+        }
+      }
+    `;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -440,6 +578,7 @@ export function generateHtmlReport(data: PerformanceReport): string {
   <style>
     ${updatedCssVariables}
     ${tabStyles}
+    ${accordionStyles}
 
     * {
       margin: 0;
@@ -705,14 +844,15 @@ export function generateHtmlReport(data: PerformanceReport): string {
         🧠 Code Analysis
         ${
           data.codeAnalysis.critical.length +
-          data.codeAnalysis.warnings.length +
-          data.codeAnalysis.suggestions.length > 0
+            data.codeAnalysis.warnings.length +
+            data.codeAnalysis.suggestions.length >
+          0
             ? `<span class="tab-indicator ${
                 data.codeAnalysis.critical.length > 0
                   ? 'critical'
                   : data.codeAnalysis.warnings.length > 0
-                  ? 'warning'
-                  : 'suggestion'
+                    ? 'warning'
+                    : 'suggestion'
               }">${
                 data.codeAnalysis.critical.length +
                 data.codeAnalysis.warnings.length +
@@ -760,14 +900,118 @@ export function generateHtmlReport(data: PerformanceReport): string {
     </div>
 
     <div class="tab-content" id="lighthouse">
-      <div class="card">
-        <h3>Detailed Report</h3>
-        ${formatMarkdownToHtml(data.lighthouse.report)}
+      <div class="accordion active">
+        <div class="accordion-header">
+          <span class="accordion-title">🎯 Core Web Vitals</span>
+          <span class="accordion-icon">▼</span>
+        </div>
+        <div class="accordion-content">
+          ${formatMarkdownToHtml(data.lighthouse.report.split('## Performance Opportunities')[0])}
+        </div>
       </div>
 
-      <div class="card">
-        <h3>Analysis</h3>
-        ${formatMarkdownToHtml(data.lighthouse.analysis)}
+      <div class="accordion">
+        <div class="accordion-header">
+          <span class="accordion-title">🚀 Performance Opportunities</span>
+          <span class="accordion-icon">▼</span>
+        </div>
+        <div class="accordion-content">
+          ${(() => {
+            const section =
+              data.lighthouse.report
+                .split('## Performance Opportunities')[1]
+                ?.split('## JavaScript Issues')[0] || '';
+            return formatMarkdownToHtml(section);
+          })()}
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-header">
+          <span class="accordion-title">🔍 JavaScript Analysis</span>
+          <span class="accordion-icon">▼</span>
+        </div>
+        <div class="accordion-content">
+          ${(() => {
+            const section = data.lighthouse.report.split('## JavaScript Issues')[1] || '';
+            const parts = section.split('### Unused JavaScript');
+            const unminifiedParts = section.split('### Unminified JavaScript');
+
+            let content = '';
+
+            if (parts.length > 1) {
+              const unusedJsSection = parts[1].split('###')[0];
+              content +=
+                formatMarkdownToHtml(parts[0] + '### Unused JavaScript') +
+                `
+                <div class="expandable-list">
+                  ${formatMarkdownToHtml(unusedJsSection)}
+                </div>
+                <button class="expand-button">Show More</button>
+              `;
+            }
+
+            if (unminifiedParts.length > 1) {
+              const unminifiedJsSection = unminifiedParts[1].split('###')[0];
+              content +=
+                formatMarkdownToHtml('### Unminified JavaScript') +
+                `
+                <div class="expandable-list">
+                  ${formatMarkdownToHtml(unminifiedJsSection)}
+                </div>
+                <button class="expand-button">Show More</button>
+              `;
+
+              // Add any remaining sections
+              const remainingSections = unminifiedParts[1].split('###').slice(1);
+              if (remainingSections.length > 0) {
+                content += formatMarkdownToHtml('###' + remainingSections.join('###'));
+              }
+            }
+
+            return content || formatMarkdownToHtml(section);
+          })()}
+        </div>
+      </div>
+
+      <div class="accordion">
+        <div class="accordion-header">
+          <span class="accordion-title">📊 Analysis & Recommendations</span>
+          <span class="accordion-icon">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="nested-accordions">
+            <div class="accordion">
+              <div class="accordion-header">
+                <span class="accordion-title">🎯 Core Web Vitals Analysis</span>
+                <span class="accordion-icon">▼</span>
+              </div>
+              <div class="accordion-content">
+                ${formatMarkdownToHtml(data.lighthouse.analysis.coreWebVitals)}
+              </div>
+            </div>
+
+            <div class="accordion">
+              <div class="accordion-header">
+                <span class="accordion-title">🚀 Performance Opportunities Analysis</span>
+                <span class="accordion-icon">▼</span>
+              </div>
+              <div class="accordion-content">
+                ${formatMarkdownToHtml(data.lighthouse.analysis.performanceOpportunities)}
+              </div>
+            </div>
+
+            <div class="accordion">
+              <div class="accordion-header">
+                <span class="accordion-title">🔍 Diagnostics Analysis</span>
+                <span class="accordion-icon">▼</span>
+              </div>
+              <div class="accordion-content">
+                ${formatMarkdownToHtml(data.lighthouse.analysis.diagnostics)}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -832,14 +1076,61 @@ export function generateHtmlReport(data: PerformanceReport): string {
 
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          // Remove active class from all tabs and contents
           tabs.forEach(t => t.classList.remove('active'));
           tabContents.forEach(c => c.classList.remove('active'));
-
-          // Add active class to clicked tab and corresponding content
           tab.classList.add('active');
           const tabId = tab.getAttribute('data-tab');
           document.getElementById(tabId).classList.add('active');
+        });
+      });
+
+      function handleAccordionClick(header, isNested = false) {
+        const accordion = header.parentElement;
+        const wasActive = accordion.classList.contains('active');
+
+        if (!isNested) {
+          const mainAccordions = header.closest('.tab-content').querySelectorAll(':scope > .accordion');
+          mainAccordions.forEach(acc => {
+            if (acc !== accordion) {
+              acc.classList.remove('active');
+            }
+          });
+        } else {
+          const nestedAccordions = header.closest('.nested-accordions').querySelectorAll(':scope > .accordion');
+          nestedAccordions.forEach(acc => {
+            if (acc !== accordion) {
+              acc.classList.remove('active');
+            }
+          });
+        }
+
+        accordion.classList.toggle('active', !wasActive);
+        header.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      const mainAccordions = document.querySelectorAll('.tab-content > .accordion > .accordion-header');
+      mainAccordions.forEach(header => {
+        header.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleAccordionClick(header);
+        });
+      });
+
+      const nestedAccordions = document.querySelectorAll('.nested-accordions .accordion > .accordion-header');
+      nestedAccordions.forEach(header => {
+        header.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleAccordionClick(header, true);
+        });
+      });
+
+      const expandButtons = document.querySelectorAll('.expand-button');
+      expandButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const list = button.previousElementSibling;
+          const isExpanded = list.classList.contains('expanded');
+          list.classList.toggle('expanded');
+          button.textContent = isExpanded ? 'Show More' : 'Show Less';
         });
       });
     });
