@@ -1,3 +1,11 @@
+## [1.5.1](https://github.com/moiz-imran/perf-lens/compare/v1.5.0...v1.5.1) (2025-03-19)
+
+
+### Bug Fixes
+
+* **config:** potential fix for code scanning alert no. 3: Incomplete string escaping or encoding ([049e967](https://github.com/moiz-imran/perf-lens/commit/049e967c1cf246e74db1fa0d70d4915ad0480ead))
+* improve file pattern matching for Windows paths ([354446c](https://github.com/moiz-imran/perf-lens/commit/354446c0d0371805a0bd00ffab791b1f8ee8b020))
+
 # [1.5.0](https://github.com/moiz-imran/perf-lens/compare/v1.4.0...v1.5.0) (2025-03-19)
 
 
