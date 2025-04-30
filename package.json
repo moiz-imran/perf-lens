@@ -62,7 +62,7 @@
     "commander": "^13.1.0",
     "cosmiconfig": "^9.0.0",
     "dotenv": "^16.4.7",
-    "inquirer": "^12.5.0",
+    "inquirer": "^12.5.2",
     "lighthouse": "^12.4.0",
     "openai": "^4.87.3",
     "ora": "^8.2.0",
