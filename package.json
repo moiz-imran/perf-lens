@@ -57,7 +57,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.24.0",
     "@types/inquirer": "^9.0.7",
-    "axios": "^1.8.3",
+    "axios": "^1.8.4",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "cosmiconfig": "^9.0.0",
