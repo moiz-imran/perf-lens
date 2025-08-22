@@ -61,7 +61,7 @@
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "cosmiconfig": "^9.0.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
     "inquirer": "^12.5.2",
     "lighthouse": "^12.5.1",
     "openai": "^4.87.4",
