@@ -1,3 +1,14 @@
+## [1.5.2](https://github.com/moiz-imran/perf-lens/compare/v1.5.1...v1.5.2) (2025-08-24)
+
+
+### Bug Fixes
+
+* upgrade axios from 1.8.3 to 1.8.4 ([#4](https://github.com/moiz-imran/perf-lens/issues/4)) ([30c92c3](https://github.com/moiz-imran/perf-lens/commit/30c92c3f335f60e86e76c8c1f5dbc70c9ea6a1ad))
+* upgrade dotenv from 16.4.7 to 16.5.0 ([#6](https://github.com/moiz-imran/perf-lens/issues/6)) ([1b5a0bd](https://github.com/moiz-imran/perf-lens/commit/1b5a0bdd0caf4d918ba1e3ef613dd4d8086550e0))
+* upgrade inquirer from 12.5.0 to 12.5.2 ([#5](https://github.com/moiz-imran/perf-lens/issues/5)) ([9a0cbee](https://github.com/moiz-imran/perf-lens/commit/9a0cbee93638213f02fd22d7737c3350c6db7c93))
+* upgrade lighthouse from 12.4.0 to 12.5.1 ([#3](https://github.com/moiz-imran/perf-lens/issues/3)) ([a96b879](https://github.com/moiz-imran/perf-lens/commit/a96b879de45b59310b36ce06be2fed359841eeeb))
+* upgrade openai from 4.87.3 to 4.87.4 ([ae9bdb9](https://github.com/moiz-imran/perf-lens/commit/ae9bdb9b00bd1cc86817987528438a466c37c223))
+
 ## [1.5.1](https://github.com/moiz-imran/perf-lens/compare/v1.5.0...v1.5.1) (2025-03-19)
 
 
