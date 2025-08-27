@@ -54,7 +54,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.58.0",
     "@google/generative-ai": "^0.24.0",
     "@types/inquirer": "^9.0.7",
     "axios": "^1.8.4",
