@@ -1,3 +1,12 @@
+## [2.0.1](https://github.com/moiz-imran/perf-lens/compare/v2.0.0...v2.0.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **deps:** bump axios to 1.18.1 ([134bf48](https://github.com/moiz-imran/perf-lens/commit/134bf4880e26f187411eb9890ca3d41cc964bf86)), closes [#14-16](https://github.com/moiz-imran/perf-lens/issues/14-16)
+* **deps:** bump lighthouse to 13.4.0 ([20f69f3](https://github.com/moiz-imran/perf-lens/commit/20f69f3f1d4da7c3091fcf2f8611ae86283a953f))
+* **security:** scope transitive dep overrides and harden agent tool sandboxing ([f33a168](https://github.com/moiz-imran/perf-lens/commit/f33a168ce1e411f6b9982a6da1a7796e601abd90))
+
 # [2.0.0](https://github.com/moiz-imran/perf-lens/compare/v1.5.2...v2.0.0) (2026-07-03)
 
 
