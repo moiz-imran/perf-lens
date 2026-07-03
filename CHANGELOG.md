@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/moiz-imran/perf-lens/compare/v2.0.1...v2.0.2) (2026-07-03)
+
+
+### Bug Fixes
+
+* **security:** resolve transitive dependency vulnerabilities via overrides ([f773a71](https://github.com/moiz-imran/perf-lens/commit/f773a713aac5420440381c6005421aeec4718fcc))
+
 ## [2.0.1](https://github.com/moiz-imran/perf-lens/compare/v2.0.0...v2.0.1) (2026-07-03)
 
 
