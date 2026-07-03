@@ -97,6 +97,44 @@ describe('runAgentAnalysis', () => {
     expect(blocks[0].content).toContain('escapes the project root');
   });
 
+  it('rejects list_files patterns that escape the target directory via ..', async () => {
+    const { client, calls } = mockClient([
+      [toolUse('list_files', { pattern: '../../etc/*' })],
+      [toolUse('report_findings', { findings: [] })],
+    ]);
+    await runAgentAnalysis(client, options);
+
+    const blocks = calls[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[];
+    expect(blocks[0].is_error).toBe(true);
+    expect(blocks[0].content).toContain('escapes the project root');
+  });
+
+  it('rejects grep globs that escape the target directory via ..', async () => {
+    const { client, calls } = mockClient([
+      [toolUse('grep', { pattern: 'x', glob: '../**/*' })],
+      [toolUse('report_findings', { findings: [] })],
+    ]);
+    await runAgentAnalysis(client, options);
+
+    const blocks = calls[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[];
+    expect(blocks[0].is_error).toBe(true);
+    expect(blocks[0].content).toContain('escapes the project root');
+  });
+
+  it('does not hang on a catastrophic-backtracking grep pattern', async () => {
+    fs.writeFileSync(path.join(dir, 'src/App.tsx'), 'a'.repeat(40) + '!\n');
+    const { client, calls } = mockClient([
+      [toolUse('grep', { pattern: '(a+)+$' })],
+      [toolUse('report_findings', { findings: [] })],
+    ]);
+    const start = Date.now();
+    await runAgentAnalysis(client, options);
+    expect(Date.now() - start).toBeLessThan(5000);
+
+    const blocks = calls[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[];
+    expect(blocks[0].content).toBe('No matches.');
+  });
+
   it('returns a schema error for invalid findings and accepts the retry', async () => {
     const { client, calls } = mockClient([
       [toolUse('report_findings', { findings: [{ file: 'x' }] })],

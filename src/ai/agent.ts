@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import vm from 'vm';
 import chalk from 'chalk';
 import fg from 'fast-glob';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ const MAX_LIST_RESULTS = 200;
 const MAX_GREP_RESULTS = 100;
 const DEFAULT_MAX_FILE_SIZE = 100 * 1024;
 const AGENT_MAX_TOKENS = 16000;
+const REGEX_TIMEOUT_MS = 200;
 
 const AGENT_INSTRUCTIONS = `You are investigating a frontend codebase for performance issues.
 
@@ -48,6 +50,27 @@ export interface AgentOptions {
 function resolveWithin(baseDir: string, relativePath: string): string | null {
   const resolved = path.resolve(baseDir, relativePath);
   return resolved === baseDir || resolved.startsWith(baseDir + path.sep) ? resolved : null;
+}
+
+/**
+ * fast-glob does not sandbox `..` segments in patterns — a pattern like
+ * "../../../etc/*" happily matches outside cwd. Reject anything that isn't a
+ * plain relative pattern before it reaches fg.sync.
+ */
+function isSafeGlobPattern(pattern: string): boolean {
+  return !path.isAbsolute(pattern) && !pattern.split(/[\\/]/).includes('..');
+}
+
+/**
+ * Runs a model-supplied regex against a line with a hard wall-clock timeout,
+ * so a catastrophic-backtracking pattern can't hang the process (ReDoS).
+ */
+function safeRegexTest(regex: RegExp, line: string): boolean {
+  try {
+    return vm.runInNewContext('regex.test(line)', { regex, line }, { timeout: REGEX_TIMEOUT_MS });
+  } catch {
+    return false; // timed out or errored — skip this line rather than hang
+  }
 }
 
 function buildTools(): AgentToolDefinition[] {
@@ -128,6 +151,9 @@ function executeTool(
         const pattern =
           (input.pattern as string) ||
           '**/*.{js,jsx,ts,tsx,vue,svelte,astro,css,scss,less,sass,html}';
+        if (!isSafeGlobPattern(pattern)) {
+          return { content: `Pattern escapes the project root: ${pattern}`, isError: true };
+        }
         const files = fg.sync(pattern, {
           cwd: options.targetDir,
           ignore,
@@ -167,8 +193,12 @@ function executeTool(
       }
 
       case 'grep': {
+        const glob = (input.glob as string) || '**/*';
+        if (!isSafeGlobPattern(glob)) {
+          return { content: `Glob escapes the project root: ${glob}`, isError: true };
+        }
         const regex = new RegExp(input.pattern as string);
-        const files = fg.sync((input.glob as string) || '**/*', {
+        const files = fg.sync(glob, {
           cwd: options.targetDir,
           ignore,
           onlyFiles: true,
@@ -180,7 +210,7 @@ function executeTool(
           if (fs.statSync(absolute).size > maxFileSize) continue;
           const lines = fs.readFileSync(absolute, 'utf-8').split('\n');
           for (let i = 0; i < lines.length && matches.length < MAX_GREP_RESULTS; i++) {
-            if (regex.test(lines[i])) {
+            if (safeRegexTest(regex, lines[i])) {
               matches.push(`${file}:${i + 1}: ${lines[i].trim()}`);
             }
           }

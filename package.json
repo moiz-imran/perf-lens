@@ -95,6 +95,29 @@
     "typescript-eslint": "^8.26.1",
     "vitest": "^4.1.9"
   },
+  "overrides": {
+    "cosmiconfig": {
+      "js-yaml": "^4.2.0"
+    },
+    "lighthouse": {
+      "lodash-es": "^4.18.1",
+      "ws": "^7.5.11",
+      "@sentry/node": {
+        "minimatch": {
+          ".": "^9.0.7",
+          "brace-expansion": "^2.0.3"
+        }
+      }
+    },
+    "fast-glob": {
+      "micromatch": {
+        "picomatch": "^2.3.2"
+      }
+    },
+    "@anthropic-ai/sdk": {
+      "minimatch": "^9.0.7"
+    }
+  },
   "release": {
     "branches": [
       "main"
