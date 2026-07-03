@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 
 export async function publish(_pluginConfig, context) {
-  const child = spawn('npm', ['publish', '--provenance'], {
+  const child = spawn('npm', ['publish'], {
     cwd: context.cwd,
     stdio: 'inherit',
   });
