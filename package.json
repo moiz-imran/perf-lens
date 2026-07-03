@@ -70,7 +70,7 @@
     "cosmiconfig": "^9.0.0",
     "dotenv": "^16.4.5",
     "fast-glob": "^3.3.3",
-    "lighthouse": "^12.8.2",
+    "lighthouse": "^13.4.0",
     "ora": "^8.2.0",
     "zod": "^4.4.3"
   },
