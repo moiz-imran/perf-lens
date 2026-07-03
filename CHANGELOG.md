@@ -1,3 +1,26 @@
+# [2.0.0](https://github.com/moiz-imran/perf-lens/compare/v1.5.2...v2.0.0) (2026-07-03)
+
+
+* feat!: rebuild AI core on Anthropic SDK with structured outputs and agent mode ([d3ffc1a](https://github.com/moiz-imran/perf-lens/commit/d3ffc1a6416b02285bed97d6534604d6c08ac8d9))
+
+
+### Bug Fixes
+
+* **release:** align trusted publishing workflow ([0888747](https://github.com/moiz-imran/perf-lens/commit/08887472108b9d6248331fdf2bcf875e2a1cdfcf))
+* **release:** avoid token auth for trusted publish ([805085b](https://github.com/moiz-imran/perf-lens/commit/805085bbcc1585834287ce22675352ce35f9a41a))
+* **release:** publish with npm trusted publishing ([c168f46](https://github.com/moiz-imran/perf-lens/commit/c168f46b9f2147f9629078dafa6c454cdaf3bd4a))
+* **release:** use updated semantic-release plugins ([9db5e7d](https://github.com/moiz-imran/perf-lens/commit/9db5e7d8e079c70a3476fdd98839a076a27b4542))
+
+
+### BREAKING CHANGES
+
+* OpenAI and Gemini providers are removed — perf-lens is now
+Anthropic-only. `config set-key` no longer takes --provider; the `ai.provider`
+and `ai.temperature` config options are gone; the default model is
+claude-opus-4-8.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
 ## [1.5.2](https://github.com/moiz-imran/perf-lens/compare/v1.5.1...v1.5.2) (2025-08-24)
 
 
