@@ -1,23 +1,3 @@
-# [2.0.0](https://github.com/moiz-imran/perf-lens/compare/v1.5.2...v2.0.0) (2026-07-03)
-
-
-* feat!: rebuild AI core on Anthropic SDK with structured outputs and agent mode ([d3ffc1a](https://github.com/moiz-imran/perf-lens/commit/d3ffc1a6416b02285bed97d6534604d6c08ac8d9))
-
-
-### Bug Fixes
-
-* **release:** publish with npm trusted publishing ([c168f46](https://github.com/moiz-imran/perf-lens/commit/c168f46b9f2147f9629078dafa6c454cdaf3bd4a))
-
-
-### BREAKING CHANGES
-
-* OpenAI and Gemini providers are removed — perf-lens is now
-Anthropic-only. `config set-key` no longer takes --provider; the `ai.provider`
-and `ai.temperature` config options are gone; the default model is
-claude-opus-4-8.
-
-Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
-
 ## [1.5.2](https://github.com/moiz-imran/perf-lens/compare/v1.5.1...v1.5.2) (2025-08-24)
 
 
