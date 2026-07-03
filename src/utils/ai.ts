@@ -36,7 +36,7 @@ export function setApiKey(key: string): void {
   ensureConfigDir();
   const config = readStoredConfig();
   config.anthropicApiKey = key;
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 /**

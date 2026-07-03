@@ -10,11 +10,6 @@ export const PROMPT_KEYS = {
 
 export type PromptKey = (typeof PROMPT_KEYS)[keyof typeof PROMPT_KEYS];
 
-export interface PromptData {
-  key: PromptKey;
-  content: string;
-}
-
 // Get the directory path of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -14,8 +14,7 @@ import type {
   GlobalConfig,
 } from '../types/config.js';
 import type { AIClient } from '../ai/client.js';
-import { PromptManager } from '../prompts/promptManager.js';
-import { PROMPT_KEYS } from '../prompts/promptConfig.js';
+import { DEFAULT_PROMPTS, PROMPT_KEYS } from '../prompts/promptConfig.js';
 
 // Add type definitions for Lighthouse audit details
 interface AuditItem {
@@ -42,6 +41,36 @@ interface LighthouseAudit {
 }
 
 const COMMON_DEV_PORTS = [3000, 5173, 8080, 4321, 4000];
+
+const CWV_METRICS: ReadonlyArray<{
+  key: string;
+  label: string;
+  thresholdKey: keyof PerformanceThresholds;
+  unit: string;
+}> = [
+  {
+    key: 'first-contentful-paint',
+    label: 'First Contentful Paint',
+    thresholdKey: 'fcp',
+    unit: 'ms',
+  },
+  { key: 'first-input-delay', label: 'First Input Delay', thresholdKey: 'fid', unit: 'ms' },
+  {
+    key: 'largest-contentful-paint',
+    label: 'Largest Contentful Paint',
+    thresholdKey: 'lcp',
+    unit: 'ms',
+  },
+  { key: 'total-blocking-time', label: 'Total Blocking Time', thresholdKey: 'tbt', unit: 'ms' },
+  {
+    key: 'cumulative-layout-shift',
+    label: 'Cumulative Layout Shift',
+    thresholdKey: 'cls',
+    unit: '',
+  },
+  { key: 'speed-index', label: 'Speed Index', thresholdKey: 'speedIndex', unit: 'ms' },
+  { key: 'interactive', label: 'Time to Interactive', thresholdKey: 'tti', unit: 'ms' },
+];
 
 /**
  * Searches for a development server port in package.json scripts
@@ -151,7 +180,7 @@ async function findDevServer(): Promise<number | null> {
  * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @returns {string} Formatted report string
  */
-function formatLighthouseReport(
+export function formatLighthouseReport(
   report: Result,
   bundleThresholds?: BundleThresholds,
   performanceThresholds?: PerformanceThresholds
@@ -167,62 +196,16 @@ function formatLighthouseReport(
 
   // Core Web Vitals with thresholds
   output += '## Core Web Vitals\n';
-
-  // First Contentful Paint
-  const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
-  output += `* First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.fcp && fcp > performanceThresholds.fcp) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.fcp}ms)`;
+  for (const m of CWV_METRICS) {
+    const value = parseFloat(metrics[m.key]?.numericValue) || 0;
+    const threshold = performanceThresholds?.[m.thresholdKey];
+    output += `* ${m.label}: ${metrics[m.key]?.displayValue || 'N/A'}`;
+    if (threshold && value > threshold) {
+      output += ` ⚠️ (exceeds threshold of ${threshold}${m.unit})`;
+    }
+    output += '\n';
   }
   output += '\n';
-
-  // First Input Delay
-  const fid = parseFloat(metrics['first-input-delay']?.numericValue) || 0;
-  output += `* First Input Delay: ${metrics['first-input-delay']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.fid && fid > performanceThresholds.fid) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.fid}ms)`;
-  }
-  output += '\n';
-
-  // Largest Contentful Paint
-  const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
-  output += `* Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.lcp && lcp > performanceThresholds.lcp) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.lcp}ms)`;
-  }
-  output += '\n';
-
-  // Total Blocking Time
-  const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
-  output += `* Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.tbt && tbt > performanceThresholds.tbt) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.tbt}ms)`;
-  }
-  output += '\n';
-
-  // Cumulative Layout Shift
-  const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
-  output += `* Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.cls && cls > performanceThresholds.cls) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.cls})`;
-  }
-  output += '\n';
-
-  // Speed Index
-  const si = parseFloat(metrics['speed-index']?.numericValue) || 0;
-  output += `* Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.speedIndex && si > performanceThresholds.speedIndex) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.speedIndex}ms)`;
-  }
-  output += '\n';
-
-  // Time to Interactive
-  const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
-  output += `* Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.tti && tti > performanceThresholds.tti) {
-    output += ` ⚠️ (exceeds threshold of ${performanceThresholds.tti}ms)`;
-  }
-  output += '\n\n';
 
   // Bundle Size Analysis
   const requests = metrics['network-requests']?.details?.items || [];
@@ -393,7 +376,7 @@ function formatLighthouseReport(
  * @param {PerformanceThresholds} [performanceThresholds] - Optional thresholds for performance metrics
  * @returns {string} Formatted console output string
  */
-function formatConsoleOutput(
+export function formatConsoleOutput(
   report: Result,
   performanceThresholds?: PerformanceThresholds
 ): string {
@@ -408,62 +391,16 @@ function formatConsoleOutput(
 
   // Core Web Vitals
   output += chalk.blue.bold('Core Web Vitals:\n');
-
-  // First Contentful Paint
-  const fcp = parseFloat(metrics['first-contentful-paint']?.numericValue) || 0;
-  output += `First Contentful Paint: ${metrics['first-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.fcp && fcp > performanceThresholds.fcp) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.fcp}ms`);
+  for (const m of CWV_METRICS) {
+    const value = parseFloat(metrics[m.key]?.numericValue) || 0;
+    const threshold = performanceThresholds?.[m.thresholdKey];
+    output += `${m.label}: ${metrics[m.key]?.displayValue || 'N/A'}`;
+    if (threshold && value > threshold) {
+      output += chalk.yellow(` ⚠️  Exceeds ${threshold}${m.unit}`);
+    }
+    output += '\n';
   }
   output += '\n';
-
-  // First Input Delay
-  const fid = parseFloat(metrics['first-input-delay']?.numericValue) || 0;
-  output += `First Input Delay: ${metrics['first-input-delay']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.fid && fid > performanceThresholds.fid) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.fid}ms`);
-  }
-  output += '\n';
-
-  // Largest Contentful Paint
-  const lcp = parseFloat(metrics['largest-contentful-paint']?.numericValue) || 0;
-  output += `Largest Contentful Paint: ${metrics['largest-contentful-paint']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.lcp && lcp > performanceThresholds.lcp) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.lcp}ms`);
-  }
-  output += '\n';
-
-  // Total Blocking Time
-  const tbt = parseFloat(metrics['total-blocking-time']?.numericValue) || 0;
-  output += `Total Blocking Time: ${metrics['total-blocking-time']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.tbt && tbt > performanceThresholds.tbt) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.tbt}ms`);
-  }
-  output += '\n';
-
-  // Cumulative Layout Shift
-  const cls = parseFloat(metrics['cumulative-layout-shift']?.numericValue) || 0;
-  output += `Cumulative Layout Shift: ${metrics['cumulative-layout-shift']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.cls && cls > performanceThresholds.cls) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.cls}`);
-  }
-  output += '\n';
-
-  // Speed Index
-  const si = parseFloat(metrics['speed-index']?.numericValue) || 0;
-  output += `Speed Index: ${metrics['speed-index']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.speedIndex && si > performanceThresholds.speedIndex) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.speedIndex}ms`);
-  }
-  output += '\n';
-
-  // Time to Interactive
-  const tti = parseFloat(metrics['interactive']?.numericValue) || 0;
-  output += `Time to Interactive: ${metrics['interactive']?.displayValue || 'N/A'}`;
-  if (performanceThresholds?.tti && tti > performanceThresholds.tti) {
-    output += chalk.yellow(` ⚠️  Exceeds ${performanceThresholds.tti}ms`);
-  }
-  output += '\n\n';
 
   // Performance Opportunities
   const renderBlockingResources = metrics['render-blocking-resources']?.details?.items || [];
@@ -563,7 +500,6 @@ async function analyzeLighthouseReport(
   diagnostics: string;
 }> {
   const spinner = ora('Analyzing Lighthouse results...').start();
-  const promptManager = PromptManager.getInstance();
 
   // Split analysis into focused sections
   const sections = [
@@ -628,7 +564,7 @@ async function analyzeLighthouseReport(
   for (const section of sections) {
     spinner.text = `Analyzing ${section.name}...`;
 
-    const basePrompt = promptManager.getPrompt(PROMPT_KEYS.LIGHTHOUSE_ANALYSIS);
+    const basePrompt = DEFAULT_PROMPTS[PROMPT_KEYS.LIGHTHOUSE_ANALYSIS];
     const prompt = `${basePrompt}
 
 Please analyze this section of the Lighthouse performance report and provide detailed insights and recommendations.
@@ -647,7 +583,7 @@ Metrics Data:
 ${JSON.stringify(section.data.metrics, null, 2)}`;
 
     try {
-      const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
+      const systemPrompt = DEFAULT_PROMPTS[PROMPT_KEYS.PERFORMANCE_EXPERT];
       const response = await model.generateSuggestions(prompt, {
         systemPrompt,
         onChunk: (chunk, firstChunk) => {
@@ -852,7 +788,7 @@ export async function runLighthouse(
 
       const report = runnerResult.lhr;
       spinner.succeed('Lighthouse audit complete');
-      chrome.kill();
+      await chrome.kill();
 
       const formattedReport = formatLighthouseReport(
         report,

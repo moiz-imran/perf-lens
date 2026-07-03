@@ -7,8 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createModel } from './ai.js';
 import type { AIModelConfig, AnalysisConfig } from '../types/config.js';
 import type { AIClient } from '../ai/client.js';
-import { PromptManager } from '../prompts/promptManager.js';
-import { PROMPT_KEYS } from '../prompts/promptConfig.js';
+import { DEFAULT_PROMPTS, PROMPT_KEYS } from '../prompts/promptConfig.js';
 import { validateFindings, findingToMarkdown, type Finding } from '../ai/schema.js';
 import { AnalysisCache } from '../ai/cache.js';
 import { runAgentAnalysis } from '../ai/agent.js';
@@ -310,8 +309,7 @@ async function analyzeFileGroup(
     spinner.text = `Analyzing ${relativePaths.length} ${groupName} files (${Math.round(totalSize / 1024)}KB)...`;
   }
 
-  const promptManager = PromptManager.getInstance();
-  const prompt = `${promptManager.getPrompt(PROMPT_KEYS.CODE_ANALYSIS)}
+  const prompt = `${DEFAULT_PROMPTS[PROMPT_KEYS.CODE_ANALYSIS]}
 
 Here are the ONLY files you can reference in your analysis:
 ${relativePaths.map(file => `${file} (${fileContents[file].split('\n').length} lines)`).join('\n')}
@@ -332,7 +330,7 @@ ${relativePaths
 
     if (!findings) {
       findings = await model.analyzeCode(prompt, {
-        systemPrompt: promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT),
+        systemPrompt: DEFAULT_PROMPTS[PROMPT_KEYS.PERFORMANCE_EXPERT],
         sharedContext: buildLighthouseContext(config.lighthouseContext),
       });
     }
@@ -517,14 +515,13 @@ export async function analyzeCodebaseWithAgent(
   }
 
   const model = createModel(config.ai);
-  const promptManager = PromptManager.getInstance();
 
   console.log(chalk.blue.bold('\n🤖 Agent investigation'));
   const findings = await runAgentAnalysis(model, {
     targetDir: baseDir,
     ignore: config.ignore,
     maxFileSize: config.maxFileSize,
-    systemPrompt: promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT),
+    systemPrompt: DEFAULT_PROMPTS[PROMPT_KEYS.PERFORMANCE_EXPERT],
     lighthouseContext: buildLighthouseContext(config.lighthouseContext),
     verbose: config.verbose,
   });
