@@ -1,13 +1,13 @@
 {
   "name": "perf-lens",
-  "version": "2.0.0",
+  "version": "1.5.2",
   "description": "AI-powered frontend performance optimizer",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "perf-lens": "./dist/index.js"
+    "perf-lens": "dist/index.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
@@ -56,6 +56,9 @@
     "type": "git",
     "url": "git+https://github.com/moiz-imran/perf-lens.git"
   },
+  "publishConfig": {
+    "provenance": true
+  },
   "engines": {
     "node": ">=20"
   },
@@ -100,7 +103,13 @@
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
       "@semantic-release/changelog",
-      "@semantic-release/npm",
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": false
+        }
+      ],
+      "./scripts/npm-trusted-publish.js",
       [
         "@semantic-release/github",
         {
