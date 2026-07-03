@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { setApiKey, getApiKey } from '../../utils/ai.js';
-import type { AIProvider } from '../../types/config.js';
 
 export function createConfigCommand(): Command {
   const configCommand = new Command('config').description('Configure PerfLens settings');
@@ -9,15 +8,12 @@ export function createConfigCommand(): Command {
   configCommand
     .addCommand(
       new Command('set-key')
-        .description('Set your AI provider API key')
+        .description('Set your Anthropic API key')
         .argument('<key>', 'Your API key')
-        .option('--provider <provider>', 'AI provider (openai, anthropic, or gemini)', 'openai')
-        .action((key, options) => {
+        .action(key => {
           try {
-            setApiKey(key, options.provider as AIProvider);
-            console.log(
-              chalk.green(`${options.provider.toUpperCase()} API key saved successfully!`)
-            );
+            setApiKey(key);
+            console.log(chalk.green('Anthropic API key saved successfully!'));
           } catch (error) {
             console.error(
               chalk.red('Error saving API key:'),
@@ -28,35 +24,20 @@ export function createConfigCommand(): Command {
         })
     )
     .addCommand(
-      new Command('get-key')
-        .description('Get your currently configured API key')
-        .option('--provider <provider>', 'AI provider (openai, anthropic, or gemini)', 'openai')
-        .action(options => {
-          try {
-            const key = getApiKey(options.provider as AIProvider);
-            if (key) {
-              const maskedKey = `${key.slice(0, 4)}...${key.slice(-4)}`;
-              console.log(
-                chalk.blue(`Current ${options.provider.toUpperCase()} API key:`, maskedKey)
-              );
-            } else {
-              console.log(
-                chalk.yellow(`No API key configured for ${options.provider.toUpperCase()}`)
-              );
-              console.log(
-                chalk.gray(
-                  `To set an API key, use:\nperf-lens config set-key YOUR_API_KEY --provider ${options.provider}`
-                )
-              );
-            }
-          } catch (error) {
-            console.error(
-              chalk.red('Error getting API key:'),
-              error instanceof Error ? error.message : error
-            );
-            process.exit(1);
-          }
-        })
+      new Command('get-key').description('Show the currently configured API key').action(() => {
+        const key = getApiKey();
+        if (key) {
+          const maskedKey = `${key.slice(0, 4)}...${key.slice(-4)}`;
+          console.log(chalk.blue('Current Anthropic API key:', maskedKey));
+        } else {
+          console.log(chalk.yellow('No API key configured'));
+          console.log(
+            chalk.gray(
+              'To set an API key, use:\nperf-lens config set-key YOUR_API_KEY\nor set the ANTHROPIC_API_KEY environment variable.'
+            )
+          );
+        }
+      })
     );
 
   return configCommand;

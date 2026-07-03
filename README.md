@@ -1,256 +1,162 @@
 # PerfLens 🔍
 
-A powerful performance analysis tool for web applications that combines Lighthouse audits with AI-powered code analysis.
+AI-powered frontend performance analysis: Lighthouse audits combined with Claude-driven code analysis, delivered as a single CLI.
 
 [![CI](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml)
 [![npm version](https://badge.fury.io/js/perf-lens.svg)](https://badge.fury.io/js/perf-lens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/perf-lens)](https://bundlephobia.com/package/perf-lens)
-[![Dependencies](https://img.shields.io/librariesio/release/npm/perf-lens)](https://libraries.io/npm/perf-lens)
-[![Known Vulnerabilities](https://snyk.io/test/github/moiz-imran/perf-lens/badge.svg)](https://snyk.io/test/github/moiz-imran/perf-lens)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
 [![Node Version](https://img.shields.io/node/v/perf-lens)](https://nodejs.org)
 
-> This project follows [Semantic Versioning](https://semver.org/). For the versions available, see the [tags on this repository](https://github.com/moiz-imran/perf-lens/tags).
+PerfLens runs a Lighthouse audit against your dev server, then analyzes your source code with Claude — using the Lighthouse results as context — and produces a markdown or HTML report of concrete, file-and-line-level performance findings.
 
-## Features
+![perf-lens HTML report](https://raw.githubusercontent.com/moiz-imran/perf-lens/main/docs/report.png)
 
-### 🌟 Lighthouse Performance Analysis
+## How it works
 
-- Core Web Vitals measurement and scoring
-- Performance bottleneck detection
-- Resource usage analysis:
-  - JavaScript execution and bundle size
-  - CSS optimization opportunities
-  - Network request analysis
-  - Resource loading optimization
+Two analysis modes share the same finding schema and report pipeline:
 
-### 🧠 AI-Powered Code Analysis
+**Scan mode (default)** — files are prioritized, batched, and sent to Claude with the Lighthouse context. Findings come back through [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) (a zod schema enforced by the API), so results are typed and validated — no fragile text parsing. Every reported file/line location is verified against the actual file before it reaches the report.
 
-- Framework-aware code scanning
-- Performance pattern detection
-- Batch processing of files with:
-  - Smart file prioritization
-  - Size-based filtering
-  - Framework-specific analysis
+**Agent mode (`--agent`)** — instead of being handed files, the model investigates the codebase itself through a hand-rolled tool-use loop (`list_files`, `read_file`, `grep`), forms hypotheses from the Lighthouse data, reads the relevant code, and submits findings via a final `report_findings` tool call. Tool access is sandboxed to the target directory.
 
-### 📊 Rich Reporting
+Under the hood:
 
-- Detailed HTML reports with:
-  - Performance metrics dashboard
-  - Critical issues highlighting
-  - Code snippets with context
-  - Actionable recommendations
-- Markdown report generation
-- File-specific insights
+- **Structured outputs** via `messages.parse()` + zod — schema-guaranteed JSON findings
+- **Agentic tool use** — multi-turn investigation loop with strict tool schemas and a forced final report
+- **Prompt caching** — the stable system prefix (expert prompt + Lighthouse context) is cached across batch calls
+- **Result caching** — unchanged file batches are never re-analyzed (`.perflens-cache.json`, content-hash keyed)
+- **Cost tracking** — every scan ends with a token + estimated cost summary
 
 ## Installation
 
-Install PerfLens as a dev dependency in your project:
-
 ```bash
 npm install --save-dev perf-lens
-# or
-yarn add -D perf-lens
-# or
-pnpm add -D perf-lens
-```
-
-Add scripts to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "analyze": "perf-lens scan",
-    "analyze:html": "perf-lens scan --output reports/performance.html --format html",
-    "analyze:md": "perf-lens scan --output reports/performance.md"
-  }
-}
-```
-
-Now you can run PerfLens using:
-
-```bash
-npm run analyze
-```
-
-### Global Installation
-
-While not recommended, you can also install PerfLens globally:
-
-```bash
+# or globally
 npm install -g perf-lens
-# Then use directly:
-perf-lens scan
 ```
 
-## Quick Start
+Requires Node.js ≥ 20 and Chrome (for Lighthouse).
 
-1. Configure your AI provider:
+## Quick start
+
+1. Set your Anthropic API key (one of):
 
 ```bash
-# Using environment variables
-export PERF_LENS_ANTHROPIC_API_KEY=your_key_here
-
-# Or using the CLI
-perf-lens config set-key YOUR_API_KEY --provider anthropic
+perf-lens config set-key YOUR_API_KEY
+# or
+export ANTHROPIC_API_KEY=YOUR_API_KEY
 ```
 
-2. Run PerfLens:
+2. Start your dev server, then run a scan from your project root:
 
 ```bash
 perf-lens scan
 ```
 
-The tool will automatically:
+PerfLens auto-detects the dev server port (from `package.json` scripts or common ports), runs Lighthouse, analyzes your code, and writes `performance-report.md`.
 
-- Detect your development server
-- Run performance audits
-- Analyze your codebase
-- Generate a detailed report
+3. Try agent mode:
+
+```bash
+perf-lens scan --agent
+```
+
+### CI gate
+
+Fail the pipeline when serious issues appear:
+
+```bash
+perf-lens scan --fail-on critical   # exit 1 if any critical finding
+perf-lens scan --fail-on warning    # exit 1 on critical or warning
+```
+
+## CLI reference
+
+```
+perf-lens scan [options]
+
+  -c, --config <path>          Path to config file
+  -p, --port <number>          Development server port
+  -t, --target <directory>     Directory to scan (default: current directory)
+  -f, --max-files <number>     Maximum number of files to analyze
+  -b, --batch-size <number>    Files per batch
+  -s, --max-size <number>      Maximum file size in KB
+  -d, --batch-delay <number>   Delay between batches (ms)
+  -o, --output <path>          Report output path
+  --format <type>              Output format: md or html
+  --agent                      Agentic analysis (model investigates via tools)
+  --fail-on <severity>         Exit 1 if findings at/above severity exist (CI gate)
+  --no-cache                   Skip the analysis result cache
+  --mobile                     Mobile emulation for Lighthouse
+  --cpu-throttle <number>      CPU throttle multiplier
+  --network-throttle <type>    slow3G | fast3G | 4G | none
+  --timeout <number>           Lighthouse timeout (ms)
+  --verbose                    Verbose output
+
+perf-lens config set-key <key>   Save your Anthropic API key
+perf-lens config get-key         Show the configured key (masked)
+```
 
 ## Configuration
 
-Create a `perflens.config.js` file in your project root:
+PerfLens loads config via [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig): `.perflensrc`, `.perflensrc.json|yaml|js`, `perflens.config.js`, or a `perflens` field in `package.json`.
 
-```javascript
-/** @type {import('perf-lens').PerflensConfig} */
+```js
+// perflens.config.js
 export default {
-  // Performance thresholds
+  ai: {
+    model: 'claude-opus-4-8', // default; use 'claude-haiku-4-5' for cheaper scans
+    maxTokens: 16000,
+  },
   thresholds: {
     performance: 90,
-    fcp: 2000,
     lcp: 2500,
-    tbt: 200,
     cls: 0.1,
-    speedIndex: 3000,
-    tti: 3800,
   },
-
-  // Bundle size thresholds
-  bundleThresholds: {
-    maxInitialSize: '250kb',
-    maxChunkSize: '50kb',
-    maxAsyncChunks: 5,
-    maxTotalSize: '1mb',
-  },
-
-  // Analysis configuration
   analysis: {
-    targetDir: 'src',
+    targetDir: '.',
     maxFiles: 200,
     batchSize: 20,
-    maxFileSize: 102400, // 100KB
-    batchDelay: 1000,
-    include: [
-      // File patterns to include
-      '**/*.js',
-      '**/*.jsx',
-      '**/*.ts',
-      '**/*.tsx',
-      '**/*.vue',
-      '**/*.svelte',
-      '**/*.astro',
-      '**/*.css',
-      '**/*.scss',
-      '**/*.less',
-      '**/*.sass',
-      '**/*.html',
-    ],
-    ignore: [
-      // Patterns to ignore (in addition to .perflensignore)
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-    ],
+    ignore: ['**/generated/**'],
   },
-
-  // Lighthouse configuration
   lighthouse: {
-    port: 3000,
     mobileEmulation: true,
-    throttling: {
-      cpu: 4,
-      network: 'fast3G',
-    },
+    throttling: { cpu: 4, network: 'fast3G' },
   },
-
-  // Output configuration
   output: {
     format: 'html',
     directory: './reports',
-    filename: 'performance-report',
-    includeTimestamp: true,
-  },
-
-  // AI configuration
-  ai: {
-    provider: 'anthropic',
-    model: 'claude-3-5-haiku-20241022',
-    maxTokens: 8192,
-    temperature: 0.2,
   },
 };
 ```
 
-See [Configuration Reference](docs/configuration/README.md) for all options.
+A `.perflensignore` file (gitignore syntax) is also honored.
 
-## CLI Options
+### Model selection
+
+The default model is `claude-opus-4-8` (deepest analysis). For faster/cheaper scans set `ai.model` to `claude-haiku-4-5`; `claude-sonnet-5` sits in between. Cost is printed after every scan so you can decide with real numbers.
+
+### API key resolution
+
+`PERF_LENS_ANTHROPIC_API_KEY` → `ANTHROPIC_API_KEY` → `~/.perf-lens/config.json` (written by `config set-key`).
+
+## Reports
+
+- **Markdown** — metrics summary, Lighthouse insights, and findings grouped by severity (🚨 critical / ⚠️ warning / 💡 suggestion), each with description, impact, solution, and a corrected code example.
+- **HTML** — the same content as a self-contained styled dashboard.
+
+## Development
 
 ```bash
-perf-lens scan [options]
+npm install
+npm run build      # tsc + prompt templates
+npm test           # vitest
+npm run typecheck
+npm run lint
 ```
 
-| Option               | Description                | Default           |
-| -------------------- | -------------------------- | ----------------- |
-| `-c, --config`       | Path to config file        | -                 |
-| `-p, --port`         | Development server port    | auto-detect       |
-| `-t, --target`       | Target directory to scan   | current directory |
-| `-f, --max-files`    | Maximum files to analyze   | 200               |
-| `-b, --batch-size`   | Files per batch            | 20                |
-| `-s, --max-size`     | Maximum file size (KB)     | 100               |
-| `-d, --batch-delay`  | Delay between batches (ms) | 1000              |
-| `-o, --output`       | Report output path         | -                 |
-| `--format`           | Output format (md/html)    | md                |
-| `--mobile`           | Enable mobile emulation    | false             |
-| `--cpu-throttle`     | CPU slowdown multiplier    | 4                 |
-| `--network-throttle` | Network throttle type      | fast3G            |
-
-## Documentation
-
-- [Getting Started Guide](docs/guides/getting-started.md)
-- [Configuration Reference](docs/configuration/README.md)
-- [API Documentation](docs/api/README.md)
-- [Examples](examples/)
-
-## Requirements
-
-- Node.js >= 18
-- Running development server
-- AI Provider API Key (OpenAI, Anthropic, or Gemini)
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+Releases are automated with semantic-release on `main`.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### Dependency Licenses
-
-This project uses several open-source packages that are licensed under various licenses:
-
-- **Primary License**: MIT
-- **Notable Dependencies**:
-  - `lighthouse` (Apache-2.0)
-  - `axe-core` (MPL-2.0) - via Lighthouse
-  - Other dependencies are primarily MIT/Apache-2.0 licensed
-
-Please note that some transitive dependencies may have different licenses. We recommend reviewing the licenses of all dependencies if you plan to use this project in a commercial setting.
-
----
-
-Built with ❤️ by [Moiz Imran](https://linkedin.com/in/moiz-imran)
-
-📧 Email: moizwasti@gmail.com
+MIT © Moiz Imran

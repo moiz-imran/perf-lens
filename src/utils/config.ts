@@ -3,7 +3,7 @@ import path from 'path';
 import { cosmiconfig } from 'cosmiconfig';
 import { z } from 'zod';
 import chalk from 'chalk';
-import type { PerflensConfig } from '../types/config';
+import type { PerflensConfig } from '../types/config.js';
 
 // Default configuration values
 export const DEFAULT_CONFIG: PerflensConfig = {
@@ -56,7 +56,8 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       '**/.svelte-kit/**',
       '**/.astro/**',
 
-      // Generated and minified files
+      // Generated and minified files (incl. perf-lens's own reports)
+      '**/performance-report-*',
       '**/*.min.js',
       '**/*.bundle.js',
       '**/*.chunk.js',
@@ -106,12 +107,6 @@ export const DEFAULT_CONFIG: PerflensConfig = {
       network: 'fast3G',
     },
   },
-  ai: {
-    provider: 'anthropic',
-    model: 'claude-3-5-haiku-20241022',
-    maxTokens: 8192,
-    temperature: 0.2,
-  },
   output: {
     format: 'md',
     includeTimestamp: true,
@@ -124,15 +119,15 @@ const configSchema = z
     // Global config
     verbose: z.boolean().optional(),
 
-    // AI config
+    // AI config (Anthropic only; model defaults live in src/ai/client.ts)
     ai: z
       .object({
-        provider: z.enum(['openai', 'anthropic', 'gemini']),
-        model: z.string(),
+        provider: z.literal('anthropic').optional(),
+        model: z.string().optional(),
         maxTokens: z.number().positive().optional(),
-        temperature: z.number().min(0).max(2).optional(),
         apiKey: z.string().optional(),
       })
+      .strict()
       .optional(),
 
     // Performance thresholds
@@ -305,7 +300,7 @@ export async function loadConfig(configPath?: string): Promise<PerflensConfig> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error(chalk.red.bold('\nConfiguration validation failed:'));
-        error.errors.forEach(err => {
+        error.issues.forEach(err => {
           console.error(
             chalk.red(`- ${err.path.join('.') || 'root'}: `) + chalk.yellow(err.message)
           );

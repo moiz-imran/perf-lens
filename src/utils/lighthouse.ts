@@ -3,7 +3,7 @@ import * as chromeLauncher from 'chrome-launcher';
 import axios from 'axios';
 import chalk from 'chalk';
 import fs from 'fs';
-import inquirer from 'inquirer';
+import readline from 'readline/promises';
 import ora from 'ora';
 import { createModel } from './ai.js';
 import type {
@@ -13,7 +13,7 @@ import type {
   AIModelConfig,
   GlobalConfig,
 } from '../types/config.js';
-import { AIModel } from '../ai/models.js';
+import type { AIClient } from '../ai/client.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { PROMPT_KEYS } from '../prompts/promptConfig.js';
 
@@ -118,36 +118,21 @@ async function findDevServer(): Promise<number | null> {
   spinner.stop();
   console.log(chalk.yellow('\nNo development server detected on common ports.'));
 
-  // If no port found, prompt the user
-  const { shouldPrompt } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'shouldPrompt',
-      message: 'Would you like to specify a custom port?',
-      default: true,
-    },
-  ]);
-
-  if (!shouldPrompt) {
+  // If no port found, prompt the user (blank answer = cancel)
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  let userPort: number;
+  try {
+    const answer = await rl.question(
+      'Enter your development server port (leave blank to cancel): '
+    );
+    userPort = parseInt(answer.trim(), 10);
+  } finally {
+    rl.close();
+  }
+  if (isNaN(userPort) || userPort < 1 || userPort > 65535) {
     return null;
   }
 
-  const { port } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'port',
-      message: 'Enter your development server port:',
-      validate: input => {
-        const port = parseInt(input, 10);
-        if (isNaN(port) || port < 1 || port > 65535) {
-          return 'Please enter a valid port number (1-65535)';
-        }
-        return true;
-      },
-    },
-  ]);
-
-  const userPort = parseInt(port, 10);
   spinner.start(`Checking port ${userPort}...`);
 
   if (await checkPort(userPort)) {
@@ -569,7 +554,7 @@ function formatConsoleOutput(
  */
 async function analyzeLighthouseReport(
   report: Result,
-  model: AIModel,
+  model: AIClient,
   performanceThresholds?: PerformanceThresholds,
   verbose?: boolean
 ): Promise<{
@@ -696,14 +681,11 @@ ${JSON.stringify(section.data.metrics, null, 2)}`;
           break;
       }
     } catch (error) {
-      console.error(`Error analyzing ${section.name}:`, error);
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        });
-      }
+      console.error(
+        chalk.yellow(
+          `Error analyzing ${section.name}: ${error instanceof Error ? error.message : error}`
+        )
+      );
       analysisResults[section.name.toLowerCase().replace(/\s+/g, '')] =
         `Error analyzing ${section.name}. Please check the raw Lighthouse report for details.`;
     }
@@ -842,7 +824,7 @@ export async function runLighthouse(
     },
   };
 
-  const model = createModel(config?.ai || { provider: 'openai', model: 'o3-mini' });
+  const model = createModel(config?.ai);
 
   while (retryCount < maxRetries) {
     try {

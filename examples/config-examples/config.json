@@ -4,7 +4,8 @@
     "batchSize": 50,
     "maxFileSize": 102400,
     "batchDelay": 1000,
-    "targetDir": "./app"
+    "targetDir": "./app",
+    "ignore": ["**/node_modules/**", "**/dist/**", "**/build/**"]
   },
   "lighthouse": {
     "port": 3000,
@@ -20,11 +21,8 @@
     "filename": "performance-analysis",
     "includeTimestamp": true
   },
-  "ignore": ["node_modules/**", "dist/**", "build/**"],
   "ai": {
-    "provider": "openai",
-    "model": "o3-mini",
-    "temperature": 0.7,
-    "maxTokens": 100000
+    "model": "claude-opus-4-8",
+    "maxTokens": 16000
   }
 }

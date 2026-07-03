@@ -33,3 +33,14 @@ coverage/
 
 # Local test files
 test-local/
+
+performance-report-*
+examples/**/package-lock.json
+
+# PerfLens local state
+.perflens-cache*
+.perflens-tokens
+.perflens-memory/
+
+# Private planning docs
+private_docs/

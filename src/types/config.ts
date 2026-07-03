@@ -1,7 +1,7 @@
 /**
  * AI provider types
  */
-export type AIProvider = 'openai' | 'anthropic' | 'gemini';
+export type AIProvider = 'anthropic';
 
 /**
  * Network throttle types
@@ -19,10 +19,9 @@ export interface GlobalConfig {
  * AI model configuration
  */
 export interface AIModelConfig {
-  provider: AIProvider;
-  model: string;
+  provider?: AIProvider;
+  model?: string;
   maxTokens?: number;
-  temperature?: number;
   apiKey?: string;
 }
 

@@ -1,12 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
+import fg from 'fast-glob';
 import ora from 'ora';
+import Anthropic from '@anthropic-ai/sdk';
 import { createModel } from './ai.js';
 import type { AIModelConfig, AnalysisConfig } from '../types/config.js';
-import type { AIModel } from '../ai/models.js';
+import type { AIClient } from '../ai/client.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { PROMPT_KEYS } from '../prompts/promptConfig.js';
+import { validateFindings, findingToMarkdown, type Finding } from '../ai/schema.js';
+import { AnalysisCache } from '../ai/cache.js';
+import { runAgentAnalysis } from '../ai/agent.js';
 
 // Default file patterns to include if none specified
 const DEFAULT_INCLUDE_PATTERNS = [
@@ -27,10 +32,14 @@ const DEFAULT_INCLUDE_PATTERNS = [
 // Maximum file size to analyze (in bytes)
 const MAX_FILE_SIZE = 100 * 1024; // 100KB
 
+// Maximum combined content size per AI request (in characters)
+const MAX_BATCH_CHARS = 100_000;
+
 interface CodeAnalysisResult {
   critical: string[];
   warnings: string[];
   suggestions: string[];
+  findings: Finding[];
   fileSpecificIssues: Record<
     string,
     {
@@ -54,6 +63,7 @@ interface CodeAnalysisConfig extends AnalysisConfig {
   lighthouseContext?: LighthouseContext;
   ai?: AIModelConfig;
   verbose?: boolean;
+  noCache?: boolean;
 }
 
 /**
@@ -85,73 +95,25 @@ function calculateFilePriority(filePath: string, size: number): number {
 }
 
 /**
- * Checks if a file should be ignored based on provided ignore patterns
- * @param {string} filePath - The path to the file
- * @param {string[]} ignorePatterns - Array of glob patterns to ignore
- * @returns {boolean} True if the file should be ignored
- */
-function shouldIgnoreFile(filePath: string, ignorePatterns: string[]): boolean {
-  const relativePath = path.relative(process.cwd(), filePath);
-  return ignorePatterns.some(pattern => {
-    const regex = new RegExp(
-      pattern.replace(/\\/g, '\\\\').replace(/\*/g, '.*').replace(/\//g, '\\/')
-    );
-    return regex.test(relativePath);
-  });
-}
-
-/**
- * Checks if a file should be included based on provided include patterns
- * @param {string} filePath - The path to the file
- * @param {string[]} includePatterns - Array of glob patterns to include
- * @returns {boolean} True if the file should be included
- */
-function shouldIncludeFile(filePath: string, includePatterns: string[]): boolean {
-  const relativePath = path.relative(process.cwd(), filePath);
-  return includePatterns.some(pattern => {
-    const regex = new RegExp(
-      pattern.replace(/\\/g, '\\\\').replace(/\*/g, '.*').replace(/\//g, '\\/')
-    );
-    return regex.test(relativePath);
-  });
-}
-
-/**
- * Recursively finds all files in a directory that match the given patterns
+ * Finds all files in a directory that match the include patterns and none of
+ * the ignore patterns.
  * @param {string} dir - The directory to search in
  * @param {AnalysisConfig} config - Configuration for file analysis
- * @returns {string[]} Array of file paths that match the patterns
+ * @returns {string[]} Array of absolute file paths
  */
 function findFiles(dir: string, config: AnalysisConfig): string[] {
   if (!fs.existsSync(dir)) {
     return [];
   }
-
-  let results: string[] = [];
-  const list = fs.readdirSync(dir);
-  const ignorePatterns = config.ignore || [];
-  const includePatterns = config.include || DEFAULT_INCLUDE_PATTERNS;
-
-  for (const file of list) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-
-    // Skip ignored directories and files
-    if (shouldIgnoreFile(filePath, ignorePatterns)) {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      results = results.concat(findFiles(filePath, config));
-    } else if (
-      shouldIncludeFile(filePath, includePatterns) &&
-      stat.size <= (config.maxFileSize || MAX_FILE_SIZE)
-    ) {
-      results.push(filePath);
-    }
-  }
-
-  return results;
+  return fg
+    .sync(config.include || DEFAULT_INCLUDE_PATTERNS, {
+      cwd: dir,
+      ignore: config.ignore || [],
+      onlyFiles: true,
+      dot: false,
+      absolute: true,
+    })
+    .filter(file => fs.statSync(file).size <= (config.maxFileSize || MAX_FILE_SIZE));
 }
 
 /**
@@ -211,244 +173,203 @@ function groupFilesByType(files: string[]): Record<string, string[]> {
 }
 
 /**
- * Analyzes a group of files for performance issues
+ * Builds the stable Lighthouse context string shared by every batch prompt.
+ * It sits in the cached system prefix, so keep it byte-identical across calls.
+ */
+export function buildLighthouseContext(lighthouseContext?: LighthouseContext): string | undefined {
+  if (!lighthouseContext) return undefined;
+  return `LIGHTHOUSE CONTEXT
+
+Performance Metrics:
+${lighthouseContext.metrics}
+
+Core Web Vitals:
+${lighthouseContext.analysis.coreWebVitals}
+
+Performance Opportunities:
+${lighthouseContext.analysis.performanceOpportunities}
+
+Diagnostics:
+${lighthouseContext.analysis.diagnostics}
+
+Use these Lighthouse insights to guide your code analysis. Look for the specific code patterns causing the performance issues identified above.`;
+}
+
+/**
+ * Turns validated findings into the report's string buckets, grouped by severity
+ * and by file.
+ */
+function bucketFindings(
+  findings: Finding[],
+  relativeToAbsolute: Record<string, string>
+): {
+  critical: string[];
+  warnings: string[];
+  suggestions: string[];
+  findings: Finding[];
+  fileIssues: Record<string, { critical: string[]; warnings: string[]; suggestions: string[] }>;
+} {
+  const buckets = {
+    findings,
+    critical: [] as string[],
+    warnings: [] as string[],
+    suggestions: [] as string[],
+    fileIssues: {} as Record<
+      string,
+      { critical: string[]; warnings: string[]; suggestions: string[] }
+    >,
+  };
+  const severityToBucket = {
+    critical: 'critical',
+    warning: 'warnings',
+    suggestion: 'suggestions',
+  } as const;
+
+  for (const finding of findings) {
+    const markdown = findingToMarkdown(finding);
+    const bucket = severityToBucket[finding.severity];
+    buckets[bucket].push(markdown);
+
+    const absolutePath = relativeToAbsolute[finding.file];
+    if (absolutePath) {
+      buckets.fileIssues[absolutePath] ??= { critical: [], warnings: [], suggestions: [] };
+      buckets.fileIssues[absolutePath][bucket].push(markdown);
+    }
+  }
+
+  return buckets;
+}
+
+/**
+ * Analyzes a group of files for performance issues using structured outputs
  * @param {string} groupName - The name of the file group (e.g., 'react', 'vue')
  * @param {string[]} files - Array of file paths to analyze
- * @param {AIModel} model - The AI model instance for analysis
+ * @param {AIClient} model - The AI client for analysis
  * @param {CodeAnalysisConfig} config - Configuration for analysis
- * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
- * @returns {Promise<{ critical: string[], warnings: string[], suggestions: string[], fileIssues: Record<string, { critical: string[], warnings: string[], suggestions: string[] }> }>} Analysis results
+ * @param {AnalysisCache} cache - Result cache keyed by batch content
+ * @returns Analysis results bucketed by severity and by file
  */
 async function analyzeFileGroup(
   groupName: string,
   files: string[],
-  model: AIModel,
+  model: AIClient,
   config: CodeAnalysisConfig,
-  lighthouseContext?: LighthouseContext
+  cache: AnalysisCache
 ): Promise<{
   critical: string[];
   warnings: string[];
   suggestions: string[];
+  findings: Finding[];
   fileIssues: Record<string, { critical: string[]; warnings: string[]; suggestions: string[] }>;
 }> {
   if (files.length === 0) {
-    return { critical: [], warnings: [], suggestions: [], fileIssues: {} };
+    return { critical: [], warnings: [], suggestions: [], findings: [], fileIssues: {} };
   }
 
   const spinner = config.verbose ? ora(`Analyzing ${groupName} files...`).start() : null;
 
-  // Prepare file contents for analysis
+  // Prepare file contents for analysis, keyed by relative path
   const fileContents: Record<string, string> = {};
+  const relativeToAbsolute: Record<string, string> = {};
   let totalSize = 0;
 
   // Sort files by size (smallest first) to maximize the number of files we can analyze
-  const sortedFiles = [...files].sort((a, b) => {
-    return fs.statSync(a).size - fs.statSync(b).size;
-  });
+  const sortedFiles = [...files].sort((a, b) => fs.statSync(a).size - fs.statSync(b).size);
 
-  // Only take files up to the configured limits
-  const filesToAnalyze: string[] = [];
   for (const file of sortedFiles) {
     const content = readFileContent(file);
     const size = content.length;
+    const relativePath = path.relative(process.cwd(), file);
 
-    // Check if adding this file would exceed our limits
     if (
-      totalSize + size <= (model.getConfig().maxTokens || 100000) && // Token limit
-      filesToAnalyze.length < (config.batchSize || 20) && // File count limit
+      totalSize + size <= MAX_BATCH_CHARS &&
+      Object.keys(fileContents).length < (config.batchSize || 20) &&
       size <= (config.maxFileSize || MAX_FILE_SIZE)
     ) {
-      // Individual file size limit
-      fileContents[file] = content;
-      filesToAnalyze.push(file);
+      fileContents[relativePath] = content;
+      relativeToAbsolute[relativePath] = file;
       totalSize += size;
     } else if (size > (config.maxFileSize || MAX_FILE_SIZE)) {
       if (spinner) spinner.stop();
       console.log(
         chalk.yellow(
-          `\nSkipping ${path.relative(process.cwd(), file)} (${Math.round(size / 1024)}KB) - exceeds size limit of ${Math.round((config.maxFileSize || 100 * 1024) / 1024)}KB`
+          `\nSkipping ${relativePath} (${Math.round(size / 1024)}KB) - exceeds size limit of ${Math.round((config.maxFileSize || MAX_FILE_SIZE) / 1024)}KB`
         )
       );
       if (spinner) spinner.start();
     }
   }
 
-  if (spinner) {
-    spinner.text = `Analyzing ${filesToAnalyze.length} ${groupName} files (${Math.round(totalSize / 1024)}KB)...`;
-  }
-
-  // Print out the specific files being sent to the AI
-  if (config.verbose) {
+  const relativePaths = Object.keys(fileContents);
+  if (relativePaths.length === 0) {
     if (spinner) spinner.stop();
-    console.log(chalk.blue.bold(`\nAnalyzing ${groupName} files:`));
-    filesToAnalyze.forEach((file, index) => {
-      const relativePath = path.relative(process.cwd(), file);
-      const fileSize = Math.round(fileContents[file].length / 1024);
-      console.log(`  ${index + 1}. ${chalk.cyan(relativePath)} (${fileSize}KB)`);
-    });
-    if (spinner) spinner.start();
+    return { critical: [], warnings: [], suggestions: [], findings: [], fileIssues: {} };
   }
 
-  // Create analysis prompt
+  if (spinner) {
+    spinner.text = `Analyzing ${relativePaths.length} ${groupName} files (${Math.round(totalSize / 1024)}KB)...`;
+  }
+
   const promptManager = PromptManager.getInstance();
-  const basePrompt = promptManager.getPrompt(PROMPT_KEYS.CODE_ANALYSIS);
-  const prompt = `${basePrompt}
+  const prompt = `${promptManager.getPrompt(PROMPT_KEYS.CODE_ANALYSIS)}
 
 Here are the ONLY files you can reference in your analysis:
-${filesToAnalyze
-  .map(file => {
-    const relativePath = path.relative(process.cwd(), file);
-    const content = fileContents[file];
-    const lineCount = content.split('\n').length;
-    return `${relativePath} (${lineCount} lines)`;
-  })
-  .join('\n')}
+${relativePaths.map(file => `${file} (${fileContents[file].split('\n').length} lines)`).join('\n')}
 
 For each file, here is its content:
 
-${filesToAnalyze
+${relativePaths
   .map(file => {
-    const relativePath = path.relative(process.cwd(), file);
-    const content = fileContents[file];
-    const lines = content.split('\n');
-    return `=== ${relativePath} ===
-${lines.map((line, index) => `${index + 1}: ${line}`).join('\n')}
-
-`;
+    const lines = fileContents[file].split('\n');
+    return `=== ${file} ===\n${lines.map((line, index) => `${index + 1}: ${line}`).join('\n')}\n`;
   })
-  .join('\n')}
-
-${
-  lighthouseContext
-    ? `
-LIGHTHOUSE CONTEXT:
-Performance Metrics:
-${lighthouseContext.metrics}
-
-Analysis:
-${lighthouseContext.analysis}
-
-Use the above Lighthouse insights to guide your code analysis. Look for specific code patterns that might be causing the performance issues identified by Lighthouse.
-`
-    : ''
-}`;
+  .join('\n')}`;
 
   try {
-    const systemPrompt = promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT);
-    const analysisText = await model.generateSuggestions(prompt, { systemPrompt });
+    const cacheKey = cache.key(model.getConfig().model || '', fileContents);
+    let findings = cache.get(cacheKey);
+    const fromCache = findings !== undefined;
 
-    // Parse issues with improved regex patterns that validate line numbers
-    const parseIssues = (text: string, symbol: string): string[] => {
-      const pattern = new RegExp(
-        `${symbol}\\s+([^\\n]+?):(\\d+)-(\\d+)\\s*\\n` + // Filepath and line range
-          `Description:\\s*([^\\n]+)\\s*\\n` + // Description
-          `Impact:\\s*([^\\n]+)\\s*\\n` + // Impact
-          `Code Context:\\s*\`\`\`[^\\n]*\\n([\\s\\S]+?)\`\`\`\\s*\\n` + // Code context
-          `Solution:\\s*([\\s\\S]+?)\\n` + // Solution (can be multiline)
-          `Expected Improvement:\\s*([^\\n]+)`, // Expected Improvement
-        'g'
-      );
-
-      const issues: string[] = [];
-      let match;
-
-      while ((match = pattern.exec(text)) !== null) {
-        const [
-          ,
-          filepath,
-          startLine,
-          endLine,
-          description,
-          impact,
-          codeContext,
-          solution,
-          improvement,
-        ] = match;
-
-        // Validate the file exists and line numbers are valid
-        const absolutePath = path.resolve(process.cwd(), filepath);
-        if (!fileContents[absolutePath]) {
-          console.log(chalk.yellow(`Warning: Skipping issue for non-existent file: ${filepath}`));
-          continue;
-        }
-
-        const lineCount = fileContents[absolutePath].split('\n').length;
-        if (parseInt(startLine) > lineCount || parseInt(endLine) > lineCount) {
-          console.log(
-            chalk.yellow(
-              `Warning: Skipping issue with invalid line numbers in ${filepath}: ${startLine}-${endLine} (file has ${lineCount} lines)`
-            )
-          );
-          continue;
-        }
-
-        const formattedIssue =
-          `${symbol} ${filepath}:${startLine}-${endLine}\n` +
-          `**Description:** ${description.trim()}\n` +
-          `**Impact:** ${impact.trim()}\n` +
-          `**Code Context:**\n\`\`\`\n${codeContext.trim()}\n\`\`\`\n` +
-          `**Solution:** ${solution.trim()}\n` +
-          `**Expected Improvement:** ${improvement.trim()}`;
-        issues.push(formattedIssue);
-      }
-
-      return issues;
-    };
-
-    const critical = parseIssues(analysisText, '🚨');
-    const warnings = parseIssues(analysisText, '⚠️');
-    const suggestions = parseIssues(analysisText, '💡');
-
-    // Track issues by file
-    const fileIssues: Record<
-      string,
-      { critical: string[]; warnings: string[]; suggestions: string[] }
-    > = {};
-
-    // Initialize fileIssues for each file
-    filesToAnalyze.forEach(file => {
-      fileIssues[file] = {
-        critical: [],
-        warnings: [],
-        suggestions: [],
-      };
-    });
-
-    // Helper function to associate issues with files
-    const associateIssuesWithFiles = (
-      issues: string[],
-      type: 'critical' | 'warnings' | 'suggestions'
-    ) => {
-      issues.forEach(issue => {
-        // eslint-disable-next-line no-misleading-character-class
-        const fileMatch = issue.match(/^[🚨⚠️💡]\s+([^:]+):/u);
-        if (fileMatch) {
-          const relativePath = fileMatch[1];
-          const absolutePath = path.resolve(process.cwd(), relativePath);
-          if (fileIssues[absolutePath]) {
-            fileIssues[absolutePath][type].push(issue);
-          }
-        }
+    if (!findings) {
+      findings = await model.analyzeCode(prompt, {
+        systemPrompt: promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT),
+        sharedContext: buildLighthouseContext(config.lighthouseContext),
       });
-    };
+    }
 
-    // Associate issues with files
-    associateIssuesWithFiles(critical, 'critical');
-    associateIssuesWithFiles(warnings, 'warnings');
-    associateIssuesWithFiles(suggestions, 'suggestions');
+    const fileLineCounts = Object.fromEntries(
+      relativePaths.map(file => [file, fileContents[file].split('\n').length])
+    );
+    const { valid, dropped } = validateFindings(findings, fileLineCounts);
 
-    if (spinner) spinner.succeed(`Analyzed ${filesToAnalyze.length} ${groupName} files`);
+    if (dropped.length > 0 && config.verbose) {
+      if (spinner) spinner.stop();
+      console.log(
+        chalk.yellow(`Dropped ${dropped.length} finding(s) referencing non-existent files or lines`)
+      );
+      if (spinner) spinner.start();
+    }
 
-    return {
-      critical,
-      warnings,
-      suggestions,
-      fileIssues,
-    };
+    if (!fromCache) {
+      cache.set(cacheKey, valid);
+    }
+
+    if (spinner) {
+      spinner.succeed(
+        `Analyzed ${relativePaths.length} ${groupName} files${fromCache ? ' (cached)' : ''}`
+      );
+    }
+
+    return bucketFindings(valid, relativeToAbsolute);
   } catch (error) {
     if (spinner) spinner.fail(`Error analyzing ${groupName} files`);
-    console.error(error);
-    return { critical: [], warnings: [], suggestions: [], fileIssues: {} };
+    // Auth/billing/request errors won't succeed on retry — stop the scan instead
+    // of failing the same way on every remaining batch.
+    if (error instanceof Anthropic.APIError && [400, 401, 403].includes(error.status ?? 0)) {
+      throw new Error(`Anthropic API error: ${error.message}`);
+    }
+    console.error(error instanceof Error ? error.message : error);
+    return { critical: [], warnings: [], suggestions: [], findings: [], fileIssues: {} };
   }
 }
 
@@ -456,20 +377,21 @@ Use the above Lighthouse insights to guide your code analysis. Look for specific
  * Processes files in batches for analysis
  * @param {string[]} files - Array of file paths to analyze
  * @param {CodeAnalysisConfig} config - Configuration for analysis
- * @param {AIModel} model - The AI model instance for analysis
- * @param {{ metrics: string, analysis: string }} [lighthouseContext] - Optional Lighthouse analysis context
+ * @param {AIClient} model - The AI client for analysis
+ * @param {AnalysisCache} cache - Result cache
  * @returns {Promise<CodeAnalysisResult>} Combined analysis results
  */
 async function processBatchedFiles(
   files: string[],
   config: CodeAnalysisConfig,
-  model: AIModel,
-  lighthouseContext?: LighthouseContext
+  model: AIClient,
+  cache: AnalysisCache
 ): Promise<CodeAnalysisResult> {
   const result: CodeAnalysisResult = {
     critical: [],
     warnings: [],
     suggestions: [],
+    findings: [],
     fileSpecificIssues: {},
   };
 
@@ -522,18 +444,13 @@ async function processBatchedFiles(
         if (spinner) spinner.start();
       }
 
-      const batchResults = await analyzeFileGroup(
-        groupName,
-        batches[i],
-        model,
-        config,
-        lighthouseContext
-      );
+      const batchResults = await analyzeFileGroup(groupName, batches[i], model, config, cache);
 
       // Merge results
       result.critical.push(...batchResults.critical);
       result.warnings.push(...batchResults.warnings);
       result.suggestions.push(...batchResults.suggestions);
+      result.findings.push(...batchResults.findings);
 
       // Merge file-specific issues
       for (const [filePath, issues] of Object.entries(batchResults.fileIssues)) {
@@ -556,59 +473,87 @@ async function processBatchedFiles(
 }
 
 /**
- * Analyzes the entire codebase for performance issues
+ * Analyzes the codebase for performance issues
  * @param {CodeAnalysisConfig} config - Configuration for codebase analysis
  * @returns {Promise<CodeAnalysisResult>} Complete analysis results including critical issues, warnings, and suggestions
  */
 export async function analyzeCodebase(config: CodeAnalysisConfig): Promise<CodeAnalysisResult> {
-  const spinner = config.verbose ? ora('Finding files to analyze...').start() : null;
-
   // Determine the directory to scan
   const baseDir = config.targetDir ? path.resolve(process.cwd(), config.targetDir) : process.cwd();
 
-  // Verify the directory exists
   if (!fs.existsSync(baseDir)) {
-    if (spinner) spinner.fail(`Target directory does not exist: ${baseDir}`);
     throw new Error(`Target directory does not exist: ${baseDir}`);
   }
 
-  // Find all files to analyze
-  const allFiles = findFiles(baseDir, config);
-
-  if (spinner) {
-    spinner.succeed(
-      `Found ${allFiles.length} files to analyze in ${path.relative(process.cwd(), baseDir) || '.'}`
-    );
+  const files = findFiles(baseDir, config);
+  if (files.length === 0) {
+    console.log(chalk.yellow('No files found to analyze.'));
+    return { critical: [], warnings: [], suggestions: [], findings: [], fileSpecificIssues: {} };
   }
 
-  // Print summary of files found
   if (config.verbose) {
-    console.log(chalk.blue.bold('\nFiles found by type:'));
-    const filesByExt = allFiles.reduce(
-      (acc, file) => {
-        const ext = path.extname(file);
-        acc[ext] = (acc[ext] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    console.log(chalk.blue(`Found ${files.length} files to analyze`));
+  }
 
-    Object.entries(filesByExt).forEach(([ext, count]) => {
-      console.log(`${chalk.yellow(ext)}: ${count} files`);
-    });
+  const model = createModel(config.ai);
+  const cache = new AnalysisCache(process.cwd(), !config.noCache);
 
-    if (allFiles.length > (config.maxFiles || 200)) {
-      console.log(
-        chalk.yellow(
-          `\nNote: Found ${allFiles.length} files, but will only analyze the ${config.maxFiles || 200} highest priority files.`
-        )
-      );
+  return processBatchedFiles(files, config, model, cache);
+}
+
+/**
+ * Agent-mode analysis: instead of batching every file into prompts, the model
+ * investigates the codebase itself through tool use and reports findings.
+ * @param {CodeAnalysisConfig} config - Same configuration as analyzeCodebase
+ * @returns {Promise<CodeAnalysisResult>} Analysis results in the same report shape
+ */
+export async function analyzeCodebaseWithAgent(
+  config: CodeAnalysisConfig
+): Promise<CodeAnalysisResult> {
+  const baseDir = config.targetDir ? path.resolve(process.cwd(), config.targetDir) : process.cwd();
+
+  if (!fs.existsSync(baseDir)) {
+    throw new Error(`Target directory does not exist: ${baseDir}`);
+  }
+
+  const model = createModel(config.ai);
+  const promptManager = PromptManager.getInstance();
+
+  console.log(chalk.blue.bold('\n🤖 Agent investigation'));
+  const findings = await runAgentAnalysis(model, {
+    targetDir: baseDir,
+    ignore: config.ignore,
+    maxFileSize: config.maxFileSize,
+    systemPrompt: promptManager.getPrompt(PROMPT_KEYS.PERFORMANCE_EXPERT),
+    lighthouseContext: buildLighthouseContext(config.lighthouseContext),
+    verbose: config.verbose,
+  });
+
+  // Validate reported locations against the actual files on disk
+  const fileLineCounts: Record<string, number> = {};
+  const relativeToAbsolute: Record<string, string> = {};
+  for (const finding of findings) {
+    if (fileLineCounts[finding.file] !== undefined) continue;
+    const absolutePath = path.resolve(baseDir, finding.file);
+    const withinBase = absolutePath === baseDir || absolutePath.startsWith(baseDir + path.sep);
+    if (withinBase && fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+      fileLineCounts[finding.file] = readFileContent(absolutePath).split('\n').length;
+      relativeToAbsolute[finding.file] = absolutePath;
     }
   }
+  const { valid, dropped } = validateFindings(findings, fileLineCounts);
+  if (dropped.length > 0) {
+    console.log(
+      chalk.yellow(`Dropped ${dropped.length} finding(s) referencing non-existent files or lines`)
+    );
+  }
 
-  // Create AI model instance
-  const model = createModel(config.ai || { provider: 'openai', model: 'o3-mini' });
-
-  // Process files in batches with prioritization
-  return processBatchedFiles(allFiles, config, model, config.lighthouseContext);
+  const buckets = bucketFindings(valid, relativeToAbsolute);
+  return {
+    critical: buckets.critical,
+    warnings: buckets.warnings,
+    suggestions: buckets.suggestions,
+    findings: buckets.findings,
+    fileSpecificIssues: buckets.fileIssues,
+  };
 }

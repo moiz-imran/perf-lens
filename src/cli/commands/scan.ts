@@ -1,11 +1,12 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import path from 'path';
 import { runLighthouse } from '../../utils/lighthouse.js';
-import { analyzeCodebase } from '../../utils/codeAnalysis.js';
+import { analyzeCodebase, analyzeCodebaseWithAgent } from '../../utils/codeAnalysis.js';
 import { saveReport } from '../../utils/output.js';
 import { loadConfig } from '../../utils/config.js';
+import { getCostSummary } from '../../ai/cost.js';
 
 export function createScanCommand(): Command {
   const scanCommand = new Command('scan')
@@ -22,6 +23,14 @@ export function createScanCommand(): Command {
     .option('--mobile', 'Enable mobile emulation')
     .option('--cpu-throttle <number>', 'CPU throttle percentage')
     .option('--network-throttle <type>', 'Network throttle type (slow3G, fast3G, 4G, none)')
+    .option('--agent', 'Agentic analysis: the model investigates the codebase via tools')
+    .addOption(
+      new Option(
+        '--fail-on <severity>',
+        'Exit with code 1 if findings at or above this severity exist (for CI)'
+      ).choices(['critical', 'warning', 'suggestion'])
+    )
+    .option('--no-cache', 'Skip the analysis result cache')
     .option('--verbose', 'Enable verbose output')
     .option('--timeout <number>', 'Timeout in milliseconds for Lighthouse analysis')
     .option('--retries <number>', 'Number of retries for failed operations')
@@ -90,13 +99,9 @@ export function createScanCommand(): Command {
           console.log(`Output format: ${chalk.yellow(config.output?.format || 'md')}`);
 
           if (config.ai) {
-            console.log(`AI Provider: ${chalk.yellow(config.ai.provider)}`);
-            console.log(`AI Model: ${chalk.yellow(config.ai.model)}`);
+            console.log(`AI Model: ${chalk.yellow(config.ai.model || 'default')}`);
             if (config.ai.maxTokens) {
               console.log(`Max Tokens: ${chalk.yellow(config.ai.maxTokens)}`);
-            }
-            if (config.ai.temperature) {
-              console.log(`Temperature: ${chalk.yellow(config.ai.temperature)}`);
             }
           }
 
@@ -114,23 +119,21 @@ export function createScanCommand(): Command {
             ai: config.ai,
           });
 
-          // Step 2: Code analysis with Lighthouse context
-
+          // Step 2: AI code analysis
           const spinner = ora('Analyzing your code...').start();
-
-          if (config.verbose) {
-            spinner.stop();
-          }
+          if (config.verbose || options.agent) spinner.stop();
 
           try {
-            const codeAnalysisResults = await analyzeCodebase({
+            const analyze = options.agent ? analyzeCodebaseWithAgent : analyzeCodebase;
+            const codeAnalysisResults = await analyze({
               ...config.analysis!,
               lighthouseContext: {
                 metrics: lhResults.metrics,
                 analysis: lhResults.analysis,
               },
-              ignore: config.analysis?.ignore,
+              ai: config.ai,
               verbose: config.verbose,
+              noCache: options.cache === false,
             });
 
             if (config.verbose) {
@@ -170,6 +173,7 @@ export function createScanCommand(): Command {
                 critical: codeAnalysisResults.critical,
                 warnings: codeAnalysisResults.warnings,
                 suggestions: codeAnalysisResults.suggestions,
+                findings: codeAnalysisResults.findings,
               },
               metadata: {
                 timestamp: new Date().toISOString(),
@@ -190,29 +194,35 @@ export function createScanCommand(): Command {
             );
             console.log(chalk.green(`\nReport saved to: ${savedPath}`));
 
-            // Final summary
+            const costSummary = getCostSummary();
+            if (costSummary) {
+              console.log(chalk.gray(costSummary));
+            }
+
             console.log('\n' + chalk.blue.bold('✨ Analysis Complete'));
             console.log(chalk.gray('─'.repeat(50)));
 
-            if (config.verbose) {
-              console.log(
-                chalk.gray(
-                  "Review the two reports above for a complete understanding of your application's performance:"
-                )
-              );
-              console.log(
-                chalk.blue(
-                  '1. 🌟 Lighthouse Performance Report - Runtime metrics and opportunities'
-                )
-              );
-              console.log(
-                chalk.blue(
-                  '2. 🧠 Code Analysis - Specific code-level improvements based on Lighthouse insights'
-                )
-              );
+            // CI gate: fail when findings reach the configured severity
+            if (options.failOn) {
+              const rank = { suggestion: 0, warning: 1, critical: 2 } as const;
+              const threshold = rank[options.failOn as keyof typeof rank];
+              let failing = codeAnalysisResults.critical.length;
+              if (threshold <= 1) failing += codeAnalysisResults.warnings.length;
+              if (threshold <= 0) failing += codeAnalysisResults.suggestions.length;
+              if (failing > 0) {
+                console.log(
+                  chalk.red(
+                    `✖ ${failing} finding(s) at or above '${options.failOn}' severity (--fail-on)`
+                  )
+                );
+                process.exit(1);
+              }
             }
           } catch (error) {
-            console.error(chalk.red('Error during code analysis:'), error);
+            console.error(
+              chalk.red('Error during code analysis:'),
+              error instanceof Error ? error.message : error
+            );
             process.exit(1);
           }
         } catch (lhError) {
