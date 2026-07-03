@@ -1,13 +1,13 @@
 # PerfLens 🔍
 
-AI-powered frontend performance analysis: Lighthouse audits combined with Claude-driven code analysis, delivered as a single CLI.
+**Lighthouse finds the slow pages. PerfLens finds the slow code.**
 
 [![CI](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/moiz-imran/perf-lens/actions/workflows/ci.yml)
 [![npm version](https://badge.fury.io/js/perf-lens.svg)](https://badge.fury.io/js/perf-lens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node Version](https://img.shields.io/node/v/perf-lens)](https://nodejs.org)
 
-PerfLens runs a Lighthouse audit against your dev server, then analyzes your source code with Claude — using the Lighthouse results as context — and produces a markdown or HTML report of concrete, file-and-line-level performance findings.
+PerfLens runs Lighthouse against your dev server, then puts Claude to work on your _source code_ with those results as evidence. The report reads like a code review: "this `useEffect` in `ProductGrid.tsx:47` refetches on every render," with severity, impact, and corrected code for each finding. Every file/line location is checked against the actual file before it reaches the report, and `--fail-on critical` turns the scan into a CI gate.
 
 ![perf-lens HTML report](https://raw.githubusercontent.com/moiz-imran/perf-lens/main/docs/report.png)
 
@@ -15,7 +15,7 @@ PerfLens runs a Lighthouse audit against your dev server, then analyzes your sou
 
 Two analysis modes share the same finding schema and report pipeline:
 
-**Scan mode (default)** — files are prioritized, batched, and sent to Claude with the Lighthouse context. Findings come back through [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) (a zod schema enforced by the API), so results are typed and validated — no fragile text parsing. Every reported file/line location is verified against the actual file before it reaches the report.
+**Scan mode (default)** — files are prioritized, batched, and sent to Claude with the Lighthouse context. Findings come back through [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) (a zod schema enforced by the API), so results are typed and validated rather than scraped out of prose. Every reported file/line location is verified against the actual file before it reaches the report.
 
 **Agent mode (`--agent`)** — instead of being handed files, the model investigates the codebase itself through a hand-rolled tool-use loop (`list_files`, `read_file`, `grep`), forms hypotheses from the Lighthouse data, reads the relevant code, and submits findings via a final `report_findings` tool call. Tool access is sandboxed to the target directory.
 
@@ -144,6 +144,20 @@ The default model is `claude-opus-4-8` (deepest analysis). For faster/cheaper sc
 
 - **Markdown** — metrics summary, Lighthouse insights, and findings grouped by severity (🚨 critical / ⚠️ warning / 💡 suggestion), each with description, impact, solution, and a corrected code example.
 - **HTML** — the same content as a self-contained styled dashboard.
+
+## FAQ
+
+**Why not just hand my Lighthouse report to Claude Code or Cursor?**
+For a one-off investigation, do exactly that. It works, and it's the same idea this tool is built on. PerfLens exists for the runs after the first one. A fresh agent explores differently every time and produces different findings in different formats, which makes it a flaky CI check. PerfLens pins that down: schema-enforced structured output, every reported file/line verified before it hits the report, content-hash caching so unchanged code produces identical results instead of a re-roll, severity-based exit codes for gating, and per-scan cost you can see and cap. Build that layer around your own agent pipeline and you also own the glue code, the prompt drift, and the pager.
+
+**How is this different from Lighthouse alone?**
+Lighthouse measures and points at _resources_ (bundles, requests, images). PerfLens continues the investigation into the _code_ that produced them, and proposes the fix.
+
+**What does a scan cost?**
+You bring your own Anthropic API key and pay per scan; there's no service in the middle. Exact token usage and estimated cost are printed after every scan. Result caching means re-scans only pay for changed files, and you can set `ai.model` to `claude-haiku-4-5` for cheap scans.
+
+**Where does my code go?**
+Directly to the Anthropic API, nowhere else. In agent mode, the model's file access is sandboxed to the target directory. Use `.perflensignore` to exclude anything you don't want analyzed.
 
 ## Development
 
